@@ -13,6 +13,57 @@ from typing import Any
 
 @dataclass
 class ModelCapabilities:
+    """Capabilities supported by a model.
+    
+    Uses a capability mapping table for efficient to_list() conversion.
+    使用能力映射表实现高效的 to_list() 转换。
+    """
+
+    streaming: bool = False
+    tools: bool = False
+    vision: bool = False
+    embeddings: bool = False
+    audio: bool = False
+
+    # Capability name to attribute mapping for efficient conversion
+    # 能力名称到属性的映射，用于高效转换
+    _CAPABILITY_MAP: dict[str, str] | None = None
+
+    def __post_init__(self) -> None:
+        """Initialize the capability mapping table."""
+        if self._CAPABILITY_MAP is None:
+            # Use object.__setattr__ to work with frozen dataclass
+            object.__setattr__(
+                self,
+                "_CAPABILITY_MAP",
+                {
+                    "streaming": "streaming",
+                    "tools": "tools",
+                    "vision": "vision",
+                    "embeddings": "embeddings",
+                    "audio": "audio",
+                },
+            )
+
+    def to_list(self) -> list[str]:
+        """Convert capabilities to list representation.
+        
+        Uses the capability mapping table for efficient conversion.
+        Returns only capabilities that are enabled.
+        使用能力映射表进行高效转换，只返回已启用的能力。
+
+        Returns:
+            List of enabled capability names
+        """
+        if self._CAPABILITY_MAP is None:
+            self.__post_init__()
+
+        return [
+            name
+            for name, attr in self._CAPABILITY_MAP.items()  # type: ignore
+            if getattr(self, attr, False)
+        ]
+class ModelCapabilities:
     """Capabilities supported by a model."""
 
     streaming: bool = False

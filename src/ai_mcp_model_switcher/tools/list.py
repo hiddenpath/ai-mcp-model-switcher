@@ -2,20 +2,30 @@
 """
 MCP tool for listing available models.
 MCP工具：列出可用模型。
+
+Provides structured error responses and proper logging.
+提供结构化的错误响应和适当的日志记录。
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
 
+from ..errors import ModelSwitcherError
+from ..response import MCPResponse
 from mcp.types import TextContent, Tool
+from ..runtime.python_runtime import format_model_info
+
 
 logger = logging.getLogger(__name__)
 
 
 def tool_schema() -> Tool:
-    """Get the list_models tool schema."""
+    """Get the list_models tool schema.
+    
+    Returns:
+        Tool schema definition
+    """
     return Tool(
         name="list_models",
         description=(
@@ -45,7 +55,10 @@ def tool_schema() -> Tool:
     )
 
 
-async def handle(runtime: Any, arguments: dict[str, Any]) -> list[TextContent]:
+async def handle(
+    runtime: object,
+    arguments: dict[str, object],
+) -> list[TextContent]:
     """Handle list_models tool call.
 
     Args:
@@ -55,8 +68,6 @@ async def handle(runtime: Any, arguments: dict[str, Any]) -> list[TextContent]:
     Returns:
         List of TextContent with model list
     """
-    from ..runtime.python_runtime import format_model_info
-
     try:
         filter_provider = arguments.get("filter_provider")
         filter_capability = arguments.get("filter_capability")
@@ -72,22 +83,32 @@ async def handle(runtime: Any, arguments: dict[str, Any]) -> list[TextContent]:
             filter_capability=filter_capability,
         )
 
-        # Format response
-        result = {
-            "count": len(models),
-            "models": [format_model_info(m) for m in models],
-        }
+        # Format response with success status
+        response = MCPResponse.success(
+            data={
+                "count": len(models),
+                "models": [format_model_info(m) for m in models],
+            },
+        )
 
-        return [TextContent(type="text", text=str(result))]
+        return [response.to_text_content()]
+
+    except ModelSwitcherError as e:
+        logger.error(f"Failed to list models: {e}")
+        response = MCPResponse.error(
+            message=str(e),
+            error_type=e.__class__.__name__,
+            details=e.details if hasattr(e, 'details') else None,
+        )
+        return [response.to_text_content()]
 
     except Exception as e:
-        logger.error(f"Failed to list models: {e}")
-        return [
-            TextContent(
-                type="text",
-                text=f'{{"status": "error", "message": "Failed to list models: {e}"}}',
-            )
-        ]
+        logger.exception(f"Unexpected error in list_models: {e}")
+        response = MCPResponse.error(
+            message=f"Internal error: {e}",
+            error_type="RuntimeError",
+        )
+        return [response.to_text_content()]
 
 
 __all__ = ["tool_schema", "handle"]

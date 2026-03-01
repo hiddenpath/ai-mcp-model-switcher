@@ -2,20 +2,33 @@
 """
 MCP tool for switching AI models.
 MCP工具：切换AI模型。
+
+Provides structured error responses and proper logging.
+提供结构化的错误响应和适当的日志记录。
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
 
+from ..errors import InvalidModelError, ModelSwitcherError
+from ..response import MCPResponse
 from mcp.types import TextContent, Tool
+from ..runtime.python_runtime import (
+    extract_model_from_args,
+    format_model_info,
+)
+
 
 logger = logging.getLogger(__name__)
 
-# Tool schema definition
+
 def tool_schema() -> Tool:
-    """Get the switch_model tool schema."""
+    """Get the switch_model tool schema.
+    
+    Returns:
+        Tool schema definition
+    """
     return Tool(
         name="switch_model",
         description=(
@@ -55,9 +68,9 @@ def tool_schema() -> Tool:
 
 
 async def handle(
-    runtime: Any,
-    state_manager: Any,
-    arguments: dict[str, Any],
+    runtime: object,
+    state_manager: object,
+    arguments: dict[str, object],
 ) -> list[TextContent]:
     """Handle switch_model tool call.
 
@@ -69,11 +82,6 @@ async def handle(
     Returns:
         List of TextContent with result
     """
-    from ..runtime.python_runtime import (
-        extract_model_from_args,
-        format_model_info,
-    )
-
     try:
         model_id, api_key, base_url = extract_model_from_args(arguments)
         logger.info(f"Switching to model: {model_id}")
@@ -88,31 +96,44 @@ async def handle(
         # Update state
         state_manager.update_from_model_info(model_info)
 
-        # Format response
-        result = {
-            "status": "success",
-            "message": f"Successfully switched to {model_info.provider}/{model_info.id.split('/')[1] if '/' in model_info.id else model_info.id}",
-            **format_model_info(model_info),
-        }
+        # Format response with success status
+        response = MCPResponse.success(
+            data={
+                **format_model_info(model_info),
+            },
+            message=f"Successfully switched to {model_info.provider}/{model_info.id.split('/')[1] if '/' in model_info.id else model_info.id}",
+        )
 
-        return [TextContent(type="text", text=str(result))]
+        return [response.to_text_content()]
 
-    except ValueError as e:
-        logger.error(f"Invalid argument: {e}")
-        return [
-            TextContent(
-                type="text",
-                text=f'{{"status": "error", "message": "Invalid argument: {e}"}}',
-            )
-        ]
-    except RuntimeError as e:
+    except InvalidModelError as e:
+        # Client error - invalid input
+        logger.warning(f"Invalid argument: {e}")
+        response = MCPResponse.error(
+            message=str(e),
+            error_type="InvalidModelError",
+            details=e.details if hasattr(e, 'details') else None,
+        )
+        return [response.to_text_content()]
+
+    except ModelSwitcherError as e:
+        # Server error - switch failed
         logger.error(f"Failed to switch model: {e}")
-        return [
-            TextContent(
-                type="text",
-                text=f'{{"status": "error", "message": "Failed to switch model: {e}"}}',
-            )
-        ]
+        response = MCPResponse.error(
+            message=str(e),
+            error_type=e.__class__.__name__,
+            details=e.details if hasattr(e, 'details') else None,
+        )
+        return [response.to_text_content()]
+
+    except Exception as e:
+        # Unexpected error
+        logger.exception(f"Unexpected error in switch_model: {e}")
+        response = MCPResponse.error(
+            message=f"Internal error: {e}",
+            error_type="RuntimeError",
+        )
+        return [response.to_text_content()]
 
 
 __all__ = ["tool_schema", "handle"]

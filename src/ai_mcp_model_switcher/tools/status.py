@@ -2,20 +2,29 @@
 """
 MCP tool for getting current model status.
 MCP工具：获取当前模型状态。
+
+Provides structured error responses and proper logging.
+提供结构化的错误响应和适当的日志记录。
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
 
+from ..errors import ModelSwitcherError
+from ..response import MCPResponse
 from mcp.types import TextContent, Tool
+
 
 logger = logging.getLogger(__name__)
 
 
 def tool_schema() -> Tool:
-    """Get the get_status tool schema."""
+    """Get the get_status tool schema.
+    
+    Returns:
+        Tool schema definition
+    """
     return Tool(
         name="get_status",
         description=(
@@ -29,7 +38,7 @@ def tool_schema() -> Tool:
     )
 
 
-async def handle(state_manager: Any) -> list[TextContent]:
+async def handle(state_manager: object) -> list[TextContent]:
     """Handle get_status tool call.
 
     Args:
@@ -40,19 +49,28 @@ async def handle(state_manager: Any) -> list[TextContent]:
     """
     try:
         state = state_manager.get_state()
-
         result = state.to_dict()
 
-        return [TextContent(type="text", text=str(result))]
+        response = MCPResponse.success(data=result)
+
+        return [response.to_text_content()]
+
+    except ModelSwitcherError as e:
+        logger.error(f"Failed to get status: {e}")
+        response = MCPResponse.error(
+            message=str(e),
+            error_type=e.__class__.__name__,
+            details=e.details if hasattr(e, 'details') else None,
+        )
+        return [response.to_text_content()]
 
     except Exception as e:
-        logger.error(f"Failed to get status: {e}")
-        return [
-            TextContent(
-                type="text",
-                text=f'{{"status": "error", "message": "Failed to get status: {e}"}}',
-            )
-        ]
+        logger.exception(f"Unexpected error in get_status: {e}")
+        response = MCPResponse.error(
+            message=f"Internal error: {e}",
+            error_type="RuntimeError",
+        )
+        return [response.to_text_content()]
 
 
 __all__ = ["tool_schema", "handle"]
