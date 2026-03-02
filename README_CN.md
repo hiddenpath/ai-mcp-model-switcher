@@ -19,7 +19,7 @@ MCP（Model Context Protocol）服务器，使Agent能够从[ai-lib生态系统]
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourorg/spiderswitch.git
+git clone https://github.com/hiddenpath/spiderswitch.git
 cd spiderswitch
 
 # 安装依赖

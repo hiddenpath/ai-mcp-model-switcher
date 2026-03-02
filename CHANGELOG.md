@@ -11,12 +11,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Added connection coordination metadata in status responses: `connection_epoch` and `last_switched_at`.
 - Added concurrency protection for model switching in runtime implementation.
 - Added validation tests for API key configuration behavior.
+- Published package under new distribution name `spiderswitch` on PyPI.
 
 ### Changed
 - Improved API key setup and troubleshooting guidance in `README.md` and `README_CN.md`.
 - Updated package version to `0.2.0` in runtime and packaging metadata.
 - Updated console entrypoint to invoke package CLI correctly.
 - Improved model inventory loading to use ai-protocol model manifests dynamically.
+- Renamed project/package identity from `ai-mcp-model-switcher` to `spiderswitch`.
 
 ### Fixed
 - Fixed unknown-tool error path that previously referenced invalid response helpers.

@@ -4,6 +4,13 @@
 
 本指南说明如何将 spiderswitch MCP 服务器作为产品发布，让用户可以在 Cursor、Claude Desktop、Antigravity 等 agent 中使用。
 
+## 发布状态（已完成）
+
+- 已发布版本：`0.2.0`
+- GitHub 仓库：https://github.com/hiddenpath/spiderswitch
+- PyPI 页面：https://pypi.org/project/spiderswitch/
+- PyPI 版本页：https://pypi.org/project/spiderswitch/0.2.0/
+
 ---
 
 ## 1. 产品定位
@@ -25,7 +32,7 @@
 
 ### 2.1 版本管理
 
-当前版本: `0.1.0` (Alpha)
+当前版本: `0.2.0` (Alpha)
 
 版本策略遵循语义化版本 (SemVer):
 - `MAJOR.MINOR.PATCH`
@@ -39,7 +46,7 @@
 ```toml
 [project]
 name = "spiderswitch"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for dynamic AI model switching in ai-lib ecosystem"
 
 dependencies = [
@@ -119,7 +126,7 @@ python -m build
 twine check dist/*
 
 # 本地测试安装
-pip install dist/spiderswitch-0.1.0-py3-none-any.whl --force-reinstall
+pip install dist/spiderswitch-0.2.0-py3-none-any.whl --force-reinstall
 
 # 测试导入
 python -c "import spiderswitch; print(spiderswitch.__version__)"
@@ -159,7 +166,7 @@ pipx install spiderswitch
 ### 4.2 开发安装
 
 ```bash
-git clone https://github.com/yourorg/spiderswitch.git
+git clone https://github.com/hiddenpath/spiderswitch.git
 cd spiderswitch
 pip install -e .
 ```
@@ -189,9 +196,9 @@ CMD ["python", "-m", "spiderswitch.server"]
 发布到 Docker Hub:
 
 ```bash
-docker build -t spiderswitch:0.1.0 .
-docker tag spiderswitch:0.1.0 spiderswitch:latest
-docker push spiderswitch:0.1.0
+docker build -t spiderswitch:0.2.0 .
+docker tag spiderswitch:0.2.0 spiderswitch:latest
+docker push spiderswitch:0.2.0
 ```
 
 ---
@@ -511,8 +518,8 @@ jobs:
 创建标签并触发发布：
 
 ```bash
-git tag -a v0.1.0 -m "Release version 0.1.0"
-git push origin v0.1.0
+git tag -a v0.2.0 -m "Release version 0.2.0"
+git push origin v0.2.0
 ```
 
 ---
@@ -587,7 +594,7 @@ locust -f locustfile.py
 
 引导用户：
 1. 查看 [Troubleshooting](docs/troubleshooting.md)
-2. 搜索 [Issues](https://github.com/yourorg/spiderswitch/issues)
+2. 搜索 [Issues](https://github.com/hiddenpath/spiderswitch/issues)
 3. 创建新 Issue（使用模板）
 
 ### 12.2 Issue 模板
@@ -621,7 +628,7 @@ If applicable, add screenshots to help explain your problem.
 **Environment**
  - OS: [e.g. macOS, Linux, Windows]
  - Python version: [e.g. 3.10, 3.11, 3.12]
- - spiderswitch version: [e.g. 0.1.0]
+ - spiderswitch version: [e.g. 0.2.0]
  - MCP client: [e.g. Cursor, Claude Desktop]
 
 **Additional context**
@@ -636,7 +643,7 @@ Add any other context about the problem here.
 
 - Twitter/X:
   ```text
-  🚀 Just released spiderswitch v0.1.0!
+  🚀 Just released spiderswitch v0.2.0!
   Dynamic AI model switching for Cursor & Claude Desktop.
   Switch between OpenAI, Anthropic, and more in seconds!
   #AI #MCP #ModelSwitching #OpenSource

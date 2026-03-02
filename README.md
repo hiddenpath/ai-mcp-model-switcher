@@ -19,7 +19,7 @@ MCP (Model Context Protocol) server that enables agents to dynamically switch AI
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourorg/spiderswitch.git
+git clone https://github.com/hiddenpath/spiderswitch.git
 cd spiderswitch
 
 # Install dependencies
