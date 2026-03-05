@@ -166,7 +166,7 @@ spiderswitch 是一个通用 MCP 服务器，可以与任何支持 MCP 协议的
 | 系统 | 配置文件路径 |
 |------|-------------|
 | macOS | `~/.cursor/mcp.json` |
-| Windows | `%APPDATA%\\Cursor\\mcp.json` |
+| Windows | `%USERPROFILE%\\.cursor\\mcp.json`（推荐），回退 `%APPDATA%\\Cursor\\mcp.json` |
 | Linux | `~/.config/cursor/mcp.json` |
 
 **配置步骤**：
@@ -175,7 +175,7 @@ spiderswitch 是一个通用 MCP 服务器，可以与任何支持 MCP 协议的
 3. 编辑配置文件，添加通用配置模板内容
 4. 重启 Cursor
 
-**注意**：Cursor 也支持项目级配置，可在项目根目录创建 `.cursor/mcp.json`。
+**注意**：Cursor 也支持项目级配置，可在项目根目录创建 `.cursor/mcp.json`。在 Windows 上如果两个用户级路径都存在，优先使用 `%USERPROFILE%\\.cursor\\mcp.json`。
 
 ---
 

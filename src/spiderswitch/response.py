@@ -6,6 +6,7 @@ Unified MCP response format and utilities.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -56,7 +57,10 @@ class MCPResponse:
         Returns:
             TextContent object with serialized response
         """
-        return TextContent(type="text", text=str(self.to_dict()))
+        return TextContent(
+            type="text",
+            text=json.dumps(self.to_dict(), ensure_ascii=False),
+        )
 
     @classmethod
     def success(
@@ -128,7 +132,7 @@ def format_error_response(
     if error_code:
         error_dict["error"]["code"] = error_code
 
-    return TextContent(type="text", text=str(error_dict))
+    return TextContent(type="text", text=json.dumps(error_dict, ensure_ascii=False))
 
 
 def format_success_response(
@@ -150,7 +154,7 @@ def format_success_response(
     if message:
         response_dict["message"] = message
 
-    return TextContent(type="text", text=str(response_dict))
+    return TextContent(type="text", text=json.dumps(response_dict, ensure_ascii=False))
 
 
 __all__ = [

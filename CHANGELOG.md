@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format is based on Keep a Changelog and this project follows Semantic Versioning.
 
+## [Unreleased]
+
+### Fixed
+- Ensured MCP text payloads are serialized as valid JSON (not Python dict repr), improving compatibility with strict MCP clients.
+
+### Changed
+- Updated Cursor Windows configuration guidance in `USER_GUIDE.md` and `USER_GUIDE_CN.md` to prefer `%USERPROFILE%\\.cursor\\mcp.json` with `%APPDATA%\\Cursor\\mcp.json` fallback.
+
 ## [0.3.0] - 2026-03-02
 
 ### Added

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import ast
+import json
 
 import pytest
 
@@ -87,7 +87,7 @@ async def test_list_tool_ignores_non_string_filter_arguments() -> None:
     assert runtime.last_filter_provider is None
     assert runtime.last_filter_capability is None
     assert len(response) == 1
-    payload = ast.literal_eval(response[0].text)
+    payload = json.loads(response[0].text)
     assert payload["status"] == "success"
     first_model = payload["data"]["models"][0]
     assert "api_key_status" in first_model
@@ -107,7 +107,7 @@ async def test_status_tool_includes_connection_coordination_metadata() -> None:
         )
     )
     result = await status_tool.handle(state)
-    payload = ast.literal_eval(result[0].text)
+    payload = json.loads(result[0].text)
     assert payload["status"] == "success"
     assert payload["data"]["connection_epoch"] == 1
     assert payload["data"]["last_switched_at"] is not None
@@ -119,7 +119,7 @@ async def test_switch_tool_missing_model_returns_structured_error() -> None:
     runtime = _DummyRuntime()
     state = ModelStateManager()
     result = await switch_tool.handle(runtime=runtime, state_manager=state, arguments={})
-    payload = ast.literal_eval(result[0].text)
+    payload = json.loads(result[0].text)
     assert payload["status"] == "error"
     assert payload["error"]["type"] == "InvalidModelError"
 
@@ -140,7 +140,7 @@ async def test_exit_switcher_resets_runtime_and_state() -> None:
     )
 
     result = await reset_tool.handle(runtime=runtime, state_manager=state)
-    payload = ast.literal_eval(result[0].text)
+    payload = json.loads(result[0].text)
     assert payload["status"] == "success"
     assert payload["data"]["exited"] is True
     assert payload["data"]["status"]["is_configured"] is False

@@ -181,7 +181,7 @@ spiderswitch 是一个通用的 MCP 服务器，可与任何 MCP 兼容的客户
 | 系统 | 配置文件路径 |
 |------|------------|
 | macOS | `~/.cursor/mcp.json` |
-| Windows | `%APPDATA%\Cursor\mcp.json` |
+| Windows | `%USERPROFILE%\\.cursor\\mcp.json` (recommended), fallback `%APPDATA%\\Cursor\\mcp.json` |
 | Linux | `~/.config/cursor/mcp.json` |
 
 **配置步骤**:
@@ -191,6 +191,7 @@ spiderswitch 是一个通用的 MCP 服务器，可与任何 MCP 兼容的客户
 4. 重启 Cursor
 
 **注**: Cursor 也支持项目级配置。可以在项目根目录创建 `.cursor/mcp.json`。
+在 Windows 上如果两个用户级路径都存在，优先使用 `%USERPROFILE%\\.cursor\\mcp.json`。
 
 #### OpenCode / OpenCode 兼容客户端
 
