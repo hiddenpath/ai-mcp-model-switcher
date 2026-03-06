@@ -297,21 +297,25 @@ MCP 服务器继承客户端进程的环境变量。确保：
 
 ```json
 {
-  "models": [
-    {
-      "id": "openai/gpt-4o",
-      "provider": "openai",
-      "capabilities": ["streaming", "tools", "vision"],
-      "api_key_status": {
-        "has_api_key": true
+  "status": "success",
+  "data": {
+    "count": 2,
+    "models": [
+      {
+        "id": "openai/gpt-4o",
+        "provider": "openai",
+        "capabilities": ["streaming", "tools", "vision"],
+        "api_key_status": {
+          "has_api_key": true
+        }
       }
-    },
-    {
-      "id": "anthropic/claude-3-5-sonnet",
-      "provider": "anthropic",
-      "capabilities": ["streaming", "tools", "vision"]
+    ],
+    "filtered": {
+      "require_api_key": false,
+      "provider": null,
+      "capability": null
     }
-  ]
+  }
 }
 ```
 
@@ -350,10 +354,15 @@ switch_model: anthropic/claude-3-5-sonnet
 
 ```json
 {
-  "provider": "anthropic",
-  "model": "claude-3-5-sonnet",
-  "capabilities": ["streaming", "tools", "vision"],
-  "is_configured": true
+  "status": "success",
+  "data": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet",
+    "capabilities": ["streaming", "tools", "vision"],
+    "is_configured": true,
+    "connection_epoch": 3,
+    "last_switched_at": "2026-03-05T04:00:00+00:00"
+  }
 }
 ```
 
@@ -383,8 +392,16 @@ switch_model: anthropic/claude-3-5-sonnet
 
 ```json
 {
-  "error": "Missing API key for provider: openai",
-  "hint": "Set OPENAI_API_KEY environment variable"
+  "status": "error",
+  "error": {
+    "type": "InvalidModelError",
+    "message": "Missing API key for provider: openai",
+    "details": {
+      "provider": "openai",
+      "expected_env_vars": ["OPENAI_API_KEY"],
+      "hint": "Set OPENAI_API_KEY environment variable in the MCP server process environment before calling switch_model."
+    }
+  }
 }
 ```
 

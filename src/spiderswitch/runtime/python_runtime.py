@@ -13,6 +13,8 @@ import asyncio
 import json
 import logging
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -25,7 +27,7 @@ from ..errors import (
     ModelNotFoundError,
     ModelSwitcherError,
 )
-from ..validation import DEFAULT_VALIDATOR, get_provider_proxy_status
+from ..validation import DEFAULT_VALIDATOR, PROXY_ENV_VARS, get_provider_proxy_status
 from .base import ModelCapabilities, ModelInfo, Runtime
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,7 @@ OFFICIAL_DIST_RAW_BASE_URL = (
 OFFICIAL_DIST_API_BASE_URL = (
     "https://api.github.com/repos/hiddenpath/ai-protocol/contents/dist/v1"
 )
+UNSUPPORTED_PROXY_SCHEMES = ("socks4://", "socks4a://")
 
 
 class PythonRuntime(Runtime):
@@ -128,14 +131,14 @@ class PythonRuntime(Runtime):
     def _download_file(url: str, target: Path) -> None:
         """Download a file to target path."""
         target.parent.mkdir(parents=True, exist_ok=True)
-        req = Request(url, headers={"User-Agent": "spiderswitch/0.2.0"})
+        req = Request(url, headers={"User-Agent": "spiderswitch/0.4.0"})
         with urlopen(req, timeout=10) as resp:
             content = resp.read()
         target.write_bytes(content)
 
     def _download_dir_from_github_api(self, api_url: str, target_dir: Path) -> None:
         """Download all json files from a GitHub API directory listing."""
-        req = Request(api_url, headers={"User-Agent": "spiderswitch/0.2.0"})
+        req = Request(api_url, headers={"User-Agent": "spiderswitch/0.4.0"})
         with urlopen(req, timeout=10) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
 
@@ -171,6 +174,52 @@ class PythonRuntime(Runtime):
             audio="audio" in capability_set,
         )
 
+    @staticmethod
+    def _resolve_runtime_model_id(provider: str, raw_model_id: str) -> str:
+        """Resolve runtime-facing model id for AiClient.create()."""
+        if raw_model_id.startswith(f"{provider}/"):
+            return raw_model_id
+        return f"{provider}/{raw_model_id}"
+
+    @staticmethod
+    def _resolve_public_model_name(
+        provider: str,
+        model_name: str,
+        raw_model_id: str,
+    ) -> str:
+        """Resolve switchable public model name with one-level provider prefix."""
+        if model_name and "/" not in model_name:
+            return model_name
+
+        provider_prefix = f"{provider}/"
+        if raw_model_id.startswith(provider_prefix):
+            suffix = raw_model_id[len(provider_prefix) :]
+            if suffix and "/" not in suffix:
+                return suffix
+
+        # Fallback: use tail segment so the exposed ID remains switchable
+        # under the tool schema and validator pattern.
+        return raw_model_id.rsplit("/", 1)[-1]
+
+    @contextmanager
+    def _sanitized_proxy_environment(self) -> Iterator[dict[str, str]]:
+        """Temporarily unset unsupported proxy schemes for ai-lib client creation."""
+        sanitized: dict[str, str] = {}
+        for env_key in PROXY_ENV_VARS:
+            value = os.getenv(env_key)
+            if not value:
+                continue
+            lowered = value.lower()
+            if lowered.startswith(UNSUPPORTED_PROXY_SCHEMES):
+                sanitized[env_key] = value
+                os.environ.pop(env_key, None)
+
+        try:
+            yield sanitized
+        finally:
+            for env_key, value in sanitized.items():
+                os.environ[env_key] = value
+
     def _load_models_from_protocol(self, base_path: Path) -> dict[str, ModelInfo]:
         """Load model inventory from ai-protocol `v1/models/*.yaml` files."""
         model_dir = base_path / "v1" / "models"
@@ -190,6 +239,8 @@ class PythonRuntime(Runtime):
                 continue
 
             for model_name, model_data in models.items():
+                if not isinstance(model_name, str):
+                    continue
                 if not isinstance(model_data, dict):
                     continue
 
@@ -201,7 +252,13 @@ class PythonRuntime(Runtime):
                 if not isinstance(raw_model_id, str) or not raw_model_id:
                     continue
 
-                full_id = raw_model_id if "/" in raw_model_id else f"{provider}/{raw_model_id}"
+                runtime_model_id = self._resolve_runtime_model_id(provider, raw_model_id)
+                public_model_name = self._resolve_public_model_name(
+                    provider=provider,
+                    model_name=model_name,
+                    raw_model_id=raw_model_id,
+                )
+                full_id = f"{provider}/{public_model_name}"
                 capabilities_raw = model_data.get("capabilities", [])
                 capabilities = (
                     [c for c in capabilities_raw if isinstance(c, str)]
@@ -213,6 +270,7 @@ class PythonRuntime(Runtime):
                     id=full_id,
                     provider=provider,
                     capabilities=self._capabilities_from_list(capabilities),
+                    runtime_model_id=runtime_model_id,
                 )
 
         return loaded
@@ -294,6 +352,7 @@ class PythonRuntime(Runtime):
                     id=model.id,
                     provider=provider_id,
                     capabilities=model.capabilities,
+                    runtime_model_id=model.runtime_model_id,
                 )
             )
 
@@ -367,11 +426,17 @@ class PythonRuntime(Runtime):
 
             # Create new client
             try:
-                self._current_client = await AiClient.create(
-                    model=model_id,
-                    api_key=api_key,
-                    base_url=base_url,
-                )
+                with self._sanitized_proxy_environment() as sanitized_proxy:
+                    if sanitized_proxy:
+                        logger.warning(
+                            "Ignoring unsupported proxy scheme in env vars: %s",
+                            sorted(sanitized_proxy.keys()),
+                        )
+                    self._current_client = await AiClient.create(
+                        model=model_info.runtime_model_id or model_id,
+                        api_key=api_key,
+                        base_url=base_url,
+                    )
                 self._current_model_info = model_info
                 logger.info(f"Successfully switched to model: {model_id}")
             except Exception as e:

@@ -294,19 +294,27 @@ MCP 服务器从客户端进程继承环境变量。确保：
 
 ```json
 {
-  "count": 188,
-  "models": [
-    {
-      "id": "openai/gpt-4o",
-      "provider": "openai",
-      "capabilities": ["streaming", "tools", "vision"],
-      "api_key_status": {
+  "status": "success",
+  "data": {
+    "count": 188,
+    "models": [
+      {
+        "id": "openai/gpt-4o",
         "provider": "openai",
-        "has_api_key": true,
-        "configured_env_vars": ["OPENAI_API_KEY"]
+        "capabilities": ["streaming", "tools", "vision"],
+        "api_key_status": {
+          "provider": "openai",
+          "has_api_key": true,
+          "configured_env_vars": ["OPENAI_API_KEY"]
+        }
       }
+    ],
+    "filtered": {
+      "require_api_key": false,
+      "provider": null,
+      "capability": null
     }
-  ]
+  }
 }
 ```
 
@@ -372,12 +380,15 @@ MCP 服务器从客户端进程继承环境变量。确保：
 
 ```json
 {
-  "provider": "anthropic",
-  "model": "claude-3-5-sonnet",
-  "capabilities": ["streaming", "tools", "vision"],
-  "is_configured": true,
-  "connection_epoch": 3,
-  "last_switched_at": "2026-03-05T04:00:00+00:00"
+  "status": "success",
+  "data": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet",
+    "capabilities": ["streaming", "tools", "vision"],
+    "is_configured": true,
+    "connection_epoch": 3,
+    "last_switched_at": "2026-03-05T04:00:00+00:00"
+  }
 }
 ```
 
@@ -436,11 +447,15 @@ export SPIDERSWITCH_LOG_LEVEL=DEBUG  # DEBUG, INFO, WARNING, ERROR
 
 ```json
 {
-  "error": "Missing API key for provider: openai",
-  "details": {
-    "provider": "openai",
-    "expected_env_vars": ["OPENAI_API_KEY"],
-    "hint": "Set OPENAI_API_KEY environment variable in the MCP server process environment before calling switch_model."
+  "status": "error",
+  "error": {
+    "type": "InvalidModelError",
+    "message": "Missing API key for provider: openai",
+    "details": {
+      "provider": "openai",
+      "expected_env_vars": ["OPENAI_API_KEY"],
+      "hint": "Set OPENAI_API_KEY environment variable in the MCP server process environment before calling switch_model."
+    }
   }
 }
 ```

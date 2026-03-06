@@ -5,11 +5,12 @@
 set -e
 
 echo "========================================="
-echo "Verifying spiderswitch v0.2.0"
+echo "Verifying spiderswitch v0.4.0"
 echo "========================================="
 
-PROJECT_DIR="/home/alex/spiderswitch"
-AI_LIB_PATH="/home/alex/pyapp/ai-lib-python/src"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+AI_LIB_PATH="${AI_LIB_PATH:-}"
 
 # Check project structure
 echo ""
@@ -35,6 +36,7 @@ required_files=(
     "$PROJECT_DIR/src/spiderswitch/tools/switch.py"
     "$PROJECT_DIR/src/spiderswitch/tools/list.py"
     "$PROJECT_DIR/src/spiderswitch/tools/status.py"
+    "$PROJECT_DIR/src/spiderswitch/tools/reset.py"
     "$PROJECT_DIR/src/spiderswitch/state.py"
 )
 
@@ -61,8 +63,12 @@ echo "✓ All Python files compile successfully"
 # Check module can be imported
 echo ""
 echo "[4/5] Checking module imports..."
-cd /home/alex
-export PYTHONPATH="$AI_LIB_PATH:$PROJECT_DIR/src"
+cd "$PROJECT_DIR"
+if [ -n "$AI_LIB_PATH" ]; then
+    export PYTHONPATH="$AI_LIB_PATH:$PROJECT_DIR/src"
+else
+    export PYTHONPATH="$PROJECT_DIR/src"
+fi
 
 python3 -c "
 from spiderswitch.runtime.base import ModelCapabilities, ModelInfo
@@ -103,7 +109,7 @@ echo "Verification Complete!"
 echo "========================================="
 echo ""
 echo "Project: spiderswitch"
-echo "Version: 0.2.0"
+echo "Version: 0.4.0"
 echo "Location: $PROJECT_DIR"
 echo ""
 echo "Next steps:"

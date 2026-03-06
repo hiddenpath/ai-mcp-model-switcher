@@ -244,12 +244,13 @@ async def get_available_models(user_id):
     api_keys = await get_user_api_keys(user_id)
     
     # 2. 调用 list_models 工具，传入 API Keys
-    models = await call_spiderswitch_tool(
+    result = await call_spiderswitch_tool(
         "list_models",
         {
             "require_api_key": True  # 只返回有 API Key 的模型
         }
     )
+    models = result["data"]["models"]
     
     # 3. 对比用户配置和可用模型
     available = filter_by_user_subscription(models, user_id)

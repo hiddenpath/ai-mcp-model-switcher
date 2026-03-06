@@ -6,11 +6,19 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-06
+
+### Added
+- Added runtime model-id normalization to keep MCP-visible IDs switchable while passing provider-qualified IDs to `AiClient.create`.
+- Added regression coverage for provider-prefixed model normalization and unsupported `socks4://` proxy handling.
+
 ### Fixed
 - Ensured MCP text payloads are serialized as valid JSON (not Python dict repr), improving compatibility with strict MCP clients.
+- Temporarily sanitize unsupported SOCKS4 proxy env vars during runtime client creation to reduce avoidable switch failures.
 
 ### Changed
 - Updated Cursor Windows configuration guidance in `USER_GUIDE.md` and `USER_GUIDE_CN.md` to prefer `%USERPROFILE%\\.cursor\\mcp.json` with `%APPDATA%\\Cursor\\mcp.json` fallback.
+- Aligned public documentation examples to the unified MCP response envelope: `{\"status\":\"success\",\"data\":...}`.
 
 ## [0.3.0] - 2026-03-02
 

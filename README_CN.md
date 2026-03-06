@@ -111,9 +111,20 @@ status = await mcp_client.call_tool("get_status", {})
 ```json
 {
   "status": "success",
-  "current_provider": "anthropic",
-  "current_model": "claude-3-5-sonnet",
-  "capabilities": ["streaming", "tools", "vision"]
+  "data": {
+    "id": "anthropic/claude-3-5-sonnet",
+    "provider": "anthropic",
+    "capabilities": ["streaming", "tools", "vision"],
+    "proxy_status": {
+      "provider": "anthropic",
+      "proxy_required_guess": false,
+      "proxy_configured": false,
+      "configured_proxy_env_vars": [],
+      "hint": null
+    },
+    "warnings": []
+  },
+  "message": "Successfully switched to anthropic/claude-3-5-sonnet"
 }
 ```
 
@@ -123,36 +134,45 @@ status = await mcp_client.call_tool("get_status", {})
 
 **参数：**
 - `filter_provider`（字符串，可选）：按provider ID过滤
-- `filter_capability`（字符串，可选）：按能力过滤（`streaming`、`tools`、`vision`、`embeddings`）
+- `filter_capability`（字符串，可选）：按能力过滤（`streaming`、`tools`、`vision`、`embeddings`、`audio`）
 
 **返回：**
 ```json
 {
-  "models": [
-    {
-      "id": "openai/gpt-4o",
-      "provider": "openai",
-      "capabilities": ["streaming", "tools", "vision"],
-      "api_key_status": {
+  "status": "success",
+  "data": {
+    "count": 2,
+    "models": [
+      {
+        "id": "openai/gpt-4o",
         "provider": "openai",
-        "has_api_key": true,
-        "expected_env_vars": ["OPENAI_API_KEY"],
-        "configured_env_vars": ["OPENAI_API_KEY"]
+        "capabilities": ["streaming", "tools", "vision"],
+        "api_key_status": {
+          "provider": "openai",
+          "has_api_key": true,
+          "expected_env_vars": ["OPENAI_API_KEY"],
+          "configured_env_vars": ["OPENAI_API_KEY"]
+        },
+        "proxy_status": {
+          "provider": "openai",
+          "proxy_required_guess": true,
+          "proxy_configured": false,
+          "configured_proxy_env_vars": [],
+          "hint": "This provider may require proxy access in your network region. Set HTTPS_PROXY/HTTP_PROXY in the MCP server process environment if needed."
+        }
       },
-      "proxy_status": {
-        "provider": "openai",
-        "proxy_required_guess": true,
-        "proxy_configured": false,
-        "configured_proxy_env_vars": [],
-        "hint": "This provider may require proxy access in your network region. Set HTTPS_PROXY/HTTP_PROXY in the MCP server process environment if needed."
+      {
+        "id": "anthropic/claude-3-5-sonnet",
+        "provider": "anthropic",
+        "capabilities": ["streaming", "tools", "vision"]
       }
-    },
-    {
-      "id": "anthropic/claude-3-5-sonnet",
-      "provider": "anthropic",
-      "capabilities": ["streaming", "tools", "vision"]
+    ],
+    "filtered": {
+      "require_api_key": false,
+      "provider": null,
+      "capability": null
     }
-  ]
+  }
 }
 ```
 
@@ -163,12 +183,15 @@ status = await mcp_client.call_tool("get_status", {})
 **返回：**
 ```json
 {
-  "provider": "anthropic",
-  "model": "claude-3-5-sonnet",
-  "capabilities": ["streaming", "tools", "vision"],
-  "is_configured": true,
-  "connection_epoch": 3,
-  "last_switched_at": "2026-03-02T09:00:00+00:00"
+  "status": "success",
+  "data": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet",
+    "capabilities": ["streaming", "tools", "vision"],
+    "is_configured": true,
+    "connection_epoch": 3,
+    "last_switched_at": "2026-03-02T09:00:00+00:00"
+  }
 }
 ```
 
@@ -222,7 +245,8 @@ spiderswitch/
 │   ├── tools/              # MCP工具实现
 │   │   ├── switch.py       # switch_model工具
 │   │   ├── list.py         # list_models工具
-│   │   └── status.py       # get_status工具
+│   │   ├── status.py       # get_status工具
+│   │   └── reset.py        # exit_switcher工具
 │   ├── runtime/            # 运行时抽象层
 │   │   ├── base.py         # 基础运行时接口
 │   │   ├── python_runtime.py  # ai-lib-python实现

@@ -51,6 +51,7 @@ class ModelInfo:
     id: str
     provider: str
     capabilities: ModelCapabilities
+    runtime_model_id: str | None = None
 
 
 class Runtime(ABC):
