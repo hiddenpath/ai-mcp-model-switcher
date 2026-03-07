@@ -64,6 +64,13 @@ def tool_schema() -> Tool:
                         "可选的自定义基础URL，用于测试/mock"
                     ),
                 },
+                "runtime_id": {
+                    "type": "string",
+                    "description": (
+                        "Optional runtime id selected by upper-layer strategy. "
+                        "可选，上层策略选择的运行时 ID。"
+                    ),
+                },
             },
             "required": ["model"],
         },
@@ -97,7 +104,8 @@ async def handle(
         )
 
         # Update state
-        state_manager.update_from_model_info(model_info)
+        runtime_profile = runtime.describe_runtime_profile()
+        state_manager.update_from_model_info_with_runtime(model_info, runtime_id=runtime_profile.runtime_id)
 
         proxy_status = get_provider_proxy_status(model_info.provider)
         warnings: list[str] = []
@@ -110,7 +118,7 @@ async def handle(
         response = MCPResponse.success(
             data={
                 **format_model_info(model_info),
-                "runtime_profile": runtime.describe_runtime_profile().__dict__,
+                "runtime_profile": runtime_profile.to_dict(),
                 "proxy_status": proxy_status,
                 "warnings": warnings,
             },

@@ -57,6 +57,13 @@ def tool_schema() -> Tool:
                         "如果为 true，只返回已配置 API Key 的 provider 的模型"
                     ),
                 },
+                "runtime_id": {
+                    "type": "string",
+                    "description": (
+                        "Optional runtime id selected by upper-layer strategy. "
+                        "可选，上层策略选择的运行时 ID。"
+                    ),
+                },
             },
         },
     )
@@ -132,7 +139,7 @@ async def handle(
             data={
                 "count": len(model_entries),
                 "models": model_entries,
-                "runtime_profile": runtime.describe_runtime_profile().__dict__,
+                "runtime_profile": runtime.describe_runtime_profile().to_dict(),
                 "filtered": {
                     "require_api_key": require_api_key,
                     "provider": filter_provider,

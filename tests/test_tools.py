@@ -17,6 +17,7 @@ class TestSwitchTool:
         assert schema.name == "switch_model"
         assert schema.inputSchema is not None
         assert "model" in schema.inputSchema["properties"]
+        assert "runtime_id" in schema.inputSchema["properties"]
         assert schema.inputSchema["properties"]["model"]["type"] == "string"
 
 
@@ -30,6 +31,7 @@ class TestListTool:
         assert schema.inputSchema is not None
         assert "filter_provider" in schema.inputSchema["properties"]
         assert "filter_capability" in schema.inputSchema["properties"]
+        assert "runtime_id" in schema.inputSchema["properties"]
 
 
 class TestStatusTool:
@@ -40,7 +42,7 @@ class TestStatusTool:
         schema = status.tool_schema()
         assert schema.name == "get_status"
         assert schema.inputSchema is not None
-        assert schema.inputSchema["properties"] == {}
+        assert "runtime_id" in schema.inputSchema["properties"]
 
 
 class TestResetTool:
@@ -51,4 +53,5 @@ class TestResetTool:
         schema = reset.tool_schema()
         assert schema.name == "exit_switcher"
         assert schema.inputSchema is not None
-        assert schema.inputSchema["properties"] == {}
+        assert "runtime_id" in schema.inputSchema["properties"]
+        assert "scope" in schema.inputSchema["properties"]

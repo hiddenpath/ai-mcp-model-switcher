@@ -15,6 +15,8 @@ def test_model_state_default() -> None:
     assert state.provider is None
     assert state.model is None
     assert state.capabilities is None
+    assert state.runtime_id is None
+    assert state.runtime_epoch == 0
     assert state.is_configured is False
 
 
@@ -50,6 +52,8 @@ def test_state_manager_update() -> None:
     assert state.capabilities == ["streaming", "tools"]
     assert state.is_configured is True
     assert state.connection_epoch == 1
+    assert state.runtime_id == "python-runtime"
+    assert state.runtime_epoch == 1
     assert state.last_switched_at is not None
 
 
@@ -102,3 +106,29 @@ def test_state_manager_reset() -> None:
 
     # Verify state is cleared
     assert manager.get_state().is_configured is False
+
+
+def test_state_manager_runtime_scoped_reset() -> None:
+    """Runtime-scoped reset only affects target runtime epoch map."""
+    manager = ModelStateManager()
+    manager.update_from_model_info_with_runtime(
+        ModelInfo(
+            id="openai/gpt-4o",
+            provider="openai",
+            capabilities=ModelCapabilities(streaming=True),
+        ),
+        runtime_id="python-runtime",
+    )
+    manager.update_from_model_info_with_runtime(
+        ModelInfo(
+            id="anthropic/claude-3-5-sonnet",
+            provider="anthropic",
+            capabilities=ModelCapabilities(streaming=True),
+        ),
+        runtime_id="rust-runtime",
+    )
+
+    manager.reset(runtime_id="python-runtime")
+    state = manager.get_state()
+    assert "python-runtime" not in state.runtime_epochs
+    assert "rust-runtime" in state.runtime_epochs

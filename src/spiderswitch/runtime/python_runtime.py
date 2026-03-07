@@ -511,6 +511,25 @@ class PythonRuntime(Runtime):
                 "audio_input",
                 "video_input",
             ],
+            model_capabilities=[
+                "text_generation",
+                "streaming_chat",
+                "tool_calling",
+                "vision_input",
+                "audio_input",
+                "video_input",
+            ],
+            runtime_capabilities=[
+                "runtime_switch_execution",
+                "capability_filtering",
+                "manifest_driven_loading",
+                "connection_epoch_signaling",
+            ],
+            operational_metrics={
+                "switch_lock": "asyncio_lock",
+                "supports_hot_switch": True,
+                "supports_multi_runtime_registry": True,
+            },
             notes=(
                 "Spiderswitch only exposes routing capability signals. "
                 "Policy selection should be implemented by upper-layer applications."

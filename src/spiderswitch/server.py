@@ -20,6 +20,7 @@ from mcp.types import TextContent, Tool
 from .response import MCPResponse
 from .runtime import PythonRuntime
 from .runtime.base import Runtime
+from .runtime.registry import RuntimeRegistry, RuntimeResolver
 from .state import ModelStateManager
 from .tools import list as list_tool
 from .tools import reset, status, switch
@@ -49,8 +50,15 @@ def _redact_sensitive_arguments(arguments: dict[str, object]) -> dict[str, objec
     return redacted
 
 
+def _runtime_id_from_args(arguments: dict[str, object]) -> str | None:
+    """Extract runtime_id argument with strict type check."""
+    runtime_id_raw = arguments.get("runtime_id")
+    return runtime_id_raw if isinstance(runtime_id_raw, str) else None
+
+
 def create_app(
     runtime: Runtime | None = None,
+    runtimes: dict[str, Runtime] | None = None,
     state_manager: ModelStateManager | None = None,
 ) -> Server:
     """Create MCP server with optional dependencies.
@@ -66,6 +74,15 @@ def create_app(
         Configured MCP Server instance
     """
     _runtime = runtime or PythonRuntime()
+    runtime_map = dict(runtimes or {})
+    if not runtime_map:
+        profile = _runtime.describe_runtime_profile()
+        runtime_map[profile.runtime_id] = _runtime
+    if runtime and _runtime.describe_runtime_profile().runtime_id not in runtime_map:
+        runtime_map[_runtime.describe_runtime_profile().runtime_id] = _runtime
+    default_runtime_id = _runtime.describe_runtime_profile().runtime_id
+    registry = RuntimeRegistry(runtimes=runtime_map, default_runtime_id=default_runtime_id)
+    resolver = RuntimeResolver(registry)
     _state = state_manager or ModelStateManager()
 
     app = Server("spiderswitch")
@@ -101,13 +118,39 @@ def create_app(
         args = arguments or {}
         try:
             if name == "switch_model":
-                return await switch.handle(_runtime, _state, args)
+                requested_runtime_id = _runtime_id_from_args(args)
+                resolution = resolver.resolve(
+                    requested_runtime_id=requested_runtime_id,
+                    active_runtime_id=_state.get_state().runtime_id,
+                )
+                _, target_runtime = registry.get_runtime(resolution.runtime_id)
+                return await switch.handle(target_runtime, _state, args)
             elif name == "list_models":
-                return await list_tool.handle(_runtime, args)
+                requested_runtime_id = _runtime_id_from_args(args)
+                resolution = resolver.resolve(
+                    requested_runtime_id=requested_runtime_id,
+                    active_runtime_id=_state.get_state().runtime_id,
+                )
+                _, target_runtime = registry.get_runtime(resolution.runtime_id)
+                return await list_tool.handle(target_runtime, args)
             elif name == "get_status":
-                return await status.handle(_state, _runtime)
+                requested_runtime_id = _runtime_id_from_args(args)
+                resolution = resolver.resolve(
+                    requested_runtime_id=requested_runtime_id,
+                    active_runtime_id=_state.get_state().runtime_id,
+                )
+                _, target_runtime = registry.get_runtime(resolution.runtime_id)
+                return await status.handle(_state, target_runtime)
             elif name == "exit_switcher":
-                return await reset.handle(_runtime, _state)
+                requested_runtime_id = _runtime_id_from_args(args)
+                scope_raw = args.get("scope")
+                scope = scope_raw if isinstance(scope_raw, str) and scope_raw in {"all", "runtime"} else "all"
+                resolution = resolver.resolve(
+                    requested_runtime_id=requested_runtime_id,
+                    active_runtime_id=_state.get_state().runtime_id,
+                )
+                _, target_runtime = registry.get_runtime(resolution.runtime_id)
+                return await reset.handle(target_runtime, _state, runtime_id=resolution.runtime_id, scope=scope)
             else:
                 logger.warning(f"Unknown tool requested: {name}")
                 response = MCPResponse.error(
@@ -134,6 +177,7 @@ def create_app(
 
 async def main(
     runtime: Runtime | None = None,
+    runtimes: dict[str, Runtime] | None = None,
     state_manager: ModelStateManager | None = None,
 ) -> None:
     """Main entry point for the MCP server.
@@ -148,7 +192,7 @@ async def main(
 
     _runtime = runtime or PythonRuntime()
     _state = state_manager or ModelStateManager()
-    app = create_app(_runtime, _state)
+    app = create_app(_runtime, runtimes=runtimes, state_manager=_state)
 
     try:
         # Run stdio server
@@ -168,6 +212,14 @@ async def main(
         logger.info("Cleaning up resources...")
         try:
             await _runtime.close()
+            if runtimes:
+                for runtime_id, extra_runtime in runtimes.items():
+                    if extra_runtime is _runtime:
+                        continue
+                    try:
+                        await extra_runtime.close()
+                    except Exception as runtime_close_error:
+                        logger.error("Error closing runtime '%s': %s", runtime_id, runtime_close_error)
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
         logger.info("Server shutdown complete")

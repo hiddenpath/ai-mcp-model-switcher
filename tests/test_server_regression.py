@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from spiderswitch.runtime.base import ModelCapabilities, ModelInfo, Runtime
+from spiderswitch.runtime.base import ModelCapabilities, ModelInfo, Runtime, RuntimeProfile
 from spiderswitch.server import _redact_sensitive_arguments
 from spiderswitch.state import ModelStateManager
 from spiderswitch.tools import list as list_tool
@@ -59,6 +59,13 @@ class _DummyRuntime(Runtime):
     async def get_current_model(self) -> ModelInfo | None:
         return None
 
+    def describe_runtime_profile(self) -> RuntimeProfile:
+        return RuntimeProfile(
+            runtime_id="python-runtime",
+            language="python",
+            supports=["model_switching", "provider_manifest_loading"],
+        )
+
 
 def test_redact_sensitive_arguments_masks_secret_like_keys() -> None:
     """Server log redaction should mask common secret markers."""
@@ -106,7 +113,7 @@ async def test_status_tool_includes_connection_coordination_metadata() -> None:
             capabilities=ModelCapabilities(streaming=True),
         )
     )
-    result = await status_tool.handle(state)
+    result = await status_tool.handle(state, _DummyRuntime())
     payload = json.loads(result[0].text)
     assert payload["status"] == "success"
     assert payload["data"]["connection_epoch"] == 1
@@ -145,3 +152,39 @@ async def test_exit_switcher_resets_runtime_and_state() -> None:
     assert payload["data"]["exited"] is True
     assert payload["data"]["status"]["is_configured"] is False
     assert runtime.closed is True
+
+
+@pytest.mark.asyncio
+async def test_exit_switcher_runtime_scope_keeps_other_runtime_epoch() -> None:
+    """Runtime-scoped reset should not drop unrelated runtime epochs."""
+    from spiderswitch.tools import reset as reset_tool
+
+    runtime = _DummyRuntime()
+    state = ModelStateManager()
+    state.update_from_model_info_with_runtime(
+        ModelInfo(
+            id="openai/gpt-4o",
+            provider="openai",
+            capabilities=ModelCapabilities(streaming=True),
+        ),
+        runtime_id="python-runtime",
+    )
+    state.update_from_model_info_with_runtime(
+        ModelInfo(
+            id="anthropic/claude-3-5-sonnet",
+            provider="anthropic",
+            capabilities=ModelCapabilities(streaming=True),
+        ),
+        runtime_id="rust-runtime",
+    )
+
+    result = await reset_tool.handle(
+        runtime=runtime,
+        state_manager=state,
+        runtime_id="python-runtime",
+        scope="runtime",
+    )
+    payload = json.loads(result[0].text)
+    runtime_epochs = payload["data"]["status"]["runtime_epochs"]
+    assert "python-runtime" not in runtime_epochs
+    assert "rust-runtime" in runtime_epochs

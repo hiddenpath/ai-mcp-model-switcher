@@ -29,10 +29,21 @@ def tool_schema() -> Tool:
     """
     return Tool(
         name="get_status",
-        description=("Get current model status and configuration. 获取当前模型状态和配置。"),
+        description=(
+            "Get current model status and configuration (runtime-aware). "
+            "获取当前模型状态和配置（支持运行时维度）。"
+        ),
         inputSchema={
             "type": "object",
-            "properties": {},
+            "properties": {
+                "runtime_id": {
+                    "type": "string",
+                    "description": (
+                        "Optional runtime id selected by upper-layer strategy. "
+                        "可选，上层策略选择的运行时 ID。"
+                    ),
+                },
+            },
         },
     )
 
@@ -52,7 +63,7 @@ async def handle(
     try:
         state = state_manager.get_state()
         result = state.to_dict()
-        result["runtime_profile"] = runtime.describe_runtime_profile().__dict__
+        result["runtime_profile"] = runtime.describe_runtime_profile().to_dict()
 
         response = MCPResponse.success(data=result)
 

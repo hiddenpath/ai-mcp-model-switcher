@@ -107,6 +107,7 @@ Switches to a different AI model/provider.
 - `model` (string, required): Model identifier (e.g., `openai/gpt-4o`, `anthropic/claude-3-5-sonnet`)
 - `api_key` (string, optional): Explicit API key (overrides environment variable; not recommended for production)
 - `base_url` (string, optional): Custom base URL for testing/mock
+- `runtime_id` (string, optional): Runtime target selected by upper-layer policy
 
 **Returns:**
 ```json
@@ -136,6 +137,7 @@ Lists all available models from registered providers.
 **Parameters:**
 - `filter_provider` (string, optional): Filter by provider ID
 - `filter_capability` (string, optional): Filter by capability (`streaming`, `tools`, `vision`, `embeddings`, `audio`)
+- `runtime_id` (string, optional): Runtime target selected by upper-layer policy
 
 **Returns:**
 ```json
@@ -186,6 +188,9 @@ Lists all available models from registered providers.
 
 Gets current model status and configuration.
 
+**Parameters:**
+- `runtime_id` (string, optional): Query status in a specific runtime scope
+
 **Returns:**
 ```json
 {
@@ -209,6 +214,10 @@ Gets current model status and configuration.
 ### 4. exit_switcher
 
 Explicitly reset spiderswitch state and runtime client.
+
+**Parameters:**
+- `runtime_id` (string, optional): Runtime id for scoped reset
+- `scope` (string, optional): `all` (default) or `runtime`
 
 **Returns:**
 ```json
@@ -246,6 +255,14 @@ This MCP server manages model client lifecycle internally. To avoid conflicts wi
 - Rebuild agent-side cached sessions only when `connection_epoch` increases.
 
 This pattern prevents stale session reuse after model switches and supports deterministic synchronization.
+
+## Runtime Routing Boundary
+
+spiderswitch only executes routing actions with explicit runtime signals:
+
+- Runtime capability model is exposed via `runtime_profile` (runtime-neutral schema).
+- Runtime selection policy remains in upper-layer applications.
+- Built-in registry/resolver only resolves `runtime_id` and does not implement cost/quality/business strategy.
 
 ## Architecture
 

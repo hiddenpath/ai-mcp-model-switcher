@@ -9,9 +9,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 ### Added
 - Added `runtime_profile` signal in `switch_model`, `list_models`, and `get_status` responses to expose runtime routing capabilities to upper-layer policy engines.
 - Added runtime-level profile API in runtime abstraction (`describe_runtime_profile`) and Python runtime implementation.
+- Added runtime registry/resolver execution layer for runtime-aware routing (`RuntimeRegistry`, `RuntimeResolver`).
+- Added runtime-scoped state signals (`runtime_id`, `runtime_epoch`, `runtime_epochs`) and scoped reset semantics (`scope=runtime|all`).
+- Added contract test baseline for runtime selection order (`request -> state -> default`) and runtime-aware tool behavior.
 
 ### Changed
 - Clarified routing boundary in docs: spiderswitch provides routing capability signals only; strategy policy remains in upper-layer applications.
+- Extended MCP tool schemas (`switch_model`, `list_models`, `get_status`, `exit_switcher`) with `runtime_id` and reset scope semantics.
 
 ## [0.4.0] - 2026-03-06
 

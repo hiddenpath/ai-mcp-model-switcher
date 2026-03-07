@@ -7,7 +7,8 @@ Base runtime abstraction for different ai-lib implementations.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -56,12 +57,24 @@ class ModelInfo:
 
 @dataclass
 class RuntimeProfile:
-    """Runtime-level capability profile used for routing decisions."""
+    """Runtime-neutral routing profile.
+
+    This schema intentionally exposes capability and health signals only.
+    Routing policy remains the responsibility of upper-layer applications.
+    """
 
     runtime_id: str
     language: str
     supports: list[str]
+    model_capabilities: list[str] = field(default_factory=list)
+    runtime_capabilities: list[str] = field(default_factory=list)
+    operational_metrics: dict[str, Any] = field(default_factory=dict)
+    reserved_runtimes: list[str] = field(default_factory=lambda: ["rust-runtime", "ts-runtime", "go-runtime", "wasm-runtime"])
     notes: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize profile for MCP payloads."""
+        return asdict(self)
 
 
 class Runtime(ABC):

@@ -74,6 +74,9 @@ def test_runtime_profile_exposes_routing_capability_signal() -> None:
     assert profile.language == "python"
     assert "model_switching" in profile.supports
     assert "provider_manifest_loading" in profile.supports
+    assert "streaming_chat" in profile.model_capabilities
+    assert "runtime_switch_execution" in profile.runtime_capabilities
+    assert "go-runtime" in profile.reserved_runtimes
     assert profile.notes is not None
 
 
