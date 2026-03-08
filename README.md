@@ -336,6 +336,11 @@ Routing boundary:
 - spiderswitch exposes runtime/model capability signals only.
 - Routing strategy policy (cost/latency/circuit-breaker/business rules) belongs to upper-layer applications.
 
+Deterministic routing contract:
+- runtime resolution order is fixed as `request runtime_id -> active state runtime_id -> default runtime`.
+- reset supports scoped behavior (`scope=runtime`) to clear a target runtime without global teardown.
+- contract tests in `tests/test_runtime.py` verify resolver order and scoped reset stability.
+
 ## Related Projects
 
 - [ai-protocol](https://github.com/hiddenpath/ai-protocol) - Protocol specification

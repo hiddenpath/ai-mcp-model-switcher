@@ -12,7 +12,9 @@ import pytest
 import yaml
 
 from spiderswitch.runtime.base import ModelCapabilities, ModelInfo
+from spiderswitch.runtime.registry import RuntimeRegistry, RuntimeResolver
 from spiderswitch.runtime.python_runtime import PythonRuntime
+from spiderswitch.state import ModelStateManager
 
 
 class TestModelCapabilities:
@@ -218,3 +220,66 @@ async def test_runtime_temporarily_unsets_unsupported_socks4_proxy(
     await runtime.switch_model("openai/gpt-4o")
     assert observed_proxy_during_create is None
     assert os.getenv("ALL_PROXY") == "socks4://127.0.0.1:9999"
+
+
+@pytest.mark.asyncio
+async def test_runtime_resolver_is_deterministic() -> None:
+    """Resolver must follow request -> state -> default order."""
+    python_runtime = PythonRuntime()
+    rust_runtime = PythonRuntime()
+    ts_runtime = PythonRuntime()
+    runtimes = {
+        "python-runtime": python_runtime,
+        "rust-runtime": rust_runtime,
+        "ts-runtime": ts_runtime,
+    }
+    registry = RuntimeRegistry(runtimes=runtimes, default_runtime_id="python-runtime")
+    resolver = RuntimeResolver(registry)
+
+    r1 = resolver.resolve(requested_runtime_id="ts-runtime", active_runtime_id="rust-runtime")
+    assert r1.runtime_id == "ts-runtime"
+    assert r1.source == "request"
+
+    r2 = resolver.resolve(requested_runtime_id=None, active_runtime_id="rust-runtime")
+    assert r2.runtime_id == "rust-runtime"
+    assert r2.source == "state"
+
+    r3 = resolver.resolve(requested_runtime_id=None, active_runtime_id=None)
+    assert r3.runtime_id == "python-runtime"
+    assert r3.source == "default"
+
+    await registry.close_all()
+
+
+def test_state_manager_scoped_reset_keeps_other_runtime_epochs() -> None:
+    """Runtime-scoped reset must only clear target runtime state."""
+    manager = ModelStateManager()
+    model_info = ModelInfo(
+        id="openai/gpt-4o",
+        provider="openai",
+        capabilities=ModelCapabilities(streaming=True, tools=True),
+    )
+    manager.update_from_model_info_with_runtime(model_info, runtime_id="python-runtime")
+    manager.update_from_model_info_with_runtime(model_info, runtime_id="rust-runtime")
+
+    before = manager.get_state().to_dict()
+    assert before["runtime_epochs"]["python-runtime"] == 1
+    assert before["runtime_epochs"]["rust-runtime"] == 1
+
+    manager.reset(runtime_id="python-runtime")
+    after = manager.get_state().to_dict()
+    assert "python-runtime" not in after["runtime_epochs"]
+    assert after["runtime_epochs"]["rust-runtime"] == 1
+
+
+def test_runtime_profile_fixtures_cover_tri_runtime_contract() -> None:
+    """Fixture snapshots must include python/rust/ts runtime profiles."""
+    fixture = Path(__file__).parent / "fixtures" / "runtime_profiles.yaml"
+    data = yaml.safe_load(fixture.read_text(encoding="utf-8"))
+    profiles = data.get("profiles", [])
+    ids = {p.get("runtime_id") for p in profiles}
+    assert {"python-runtime", "rust-runtime", "ts-runtime"}.issubset(ids)
+    for profile in profiles:
+        assert profile.get("language")
+        assert isinstance(profile.get("supports"), list)
+        assert "runtime_switch_execution" in profile.get("runtime_capabilities", [])
