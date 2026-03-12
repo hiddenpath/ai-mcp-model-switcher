@@ -1,0 +1,52 @@
+{
+  "id": "hiddenpath.spiderswitch",
+  "name": "spiderswitch",
+  "display_name": "Spiderswitch MCP Model Switcher",
+  "version": "0.4.0",
+  "description": "MCP server for dynamic AI model switching in ai-lib ecosystem.",
+  "entrypoint": {
+    "command": "spiderswitch",
+    "args": [
+      "serve"
+    ]
+  },
+  "install": {
+    "script": "scripts/install_one_click.sh",
+    "post_install_check": "spiderswitch doctor --json --no-runtime-probe"
+  },
+  "healthcheck": {
+    "command": "spiderswitch",
+    "args": [
+      "doctor",
+      "--json"
+    ]
+  },
+  "configuration": [
+    {
+      "key": "AI_PROTOCOL_PATH",
+      "required": true,
+      "description": "Path to local ai-protocol repository root."
+    },
+    {
+      "key": "OPENAI_API_KEY",
+      "required": false,
+      "description": "Optional provider API key (can use other provider keys instead)."
+    },
+    {
+      "key": "SPIDERSWITCH_LIST_CACHE_TTL_SEC",
+      "required": false,
+      "default": "5",
+      "description": "TTL for list_models cache."
+    },
+    {
+      "key": "SPIDERSWITCH_STATUS_CACHE_TTL_SEC",
+      "required": false,
+      "default": "2",
+      "description": "TTL for get_status cache."
+    }
+  ],
+  "links": {
+    "homepage": "https://github.com/hiddenpath/spiderswitch",
+    "docs": "https://github.com/hiddenpath/spiderswitch#readme"
+  }
+}

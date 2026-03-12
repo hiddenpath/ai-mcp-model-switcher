@@ -11,9 +11,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+from spiderswitch.errors import ModelSwitcherError
 from spiderswitch.runtime.base import ModelCapabilities, ModelInfo
-from spiderswitch.runtime.registry import RuntimeRegistry, RuntimeResolver
 from spiderswitch.runtime.python_runtime import PythonRuntime
+from spiderswitch.runtime.registry import RuntimeRegistry, RuntimeResolver
 from spiderswitch.state import ModelStateManager
 
 
@@ -116,6 +117,32 @@ def test_runtime_auto_sets_ai_protocol_path(
     assert os.getenv("AI_PROTOCOL_PATH") == str(protocol_root)
 
 
+def test_runtime_does_not_sync_dist_on_init_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Initialization should not run dist sync unless explicitly enabled."""
+    protocol_root = tmp_path / "ai-protocol"
+    model_dir = protocol_root / "v1" / "models"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    (model_dir / "openai.yaml").write_text(
+        yaml.safe_dump(
+            {"models": {"gpt-4o": {"provider": "openai", "model_id": "gpt-4o"}}},
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("SPIDERSWITCH_SYNC_ON_INIT", raising=False)
+    runtime = PythonRuntime(ai_protocol_path=str(protocol_root))
+
+    def fail_if_called(*_: object, **__: object) -> None:
+        raise AssertionError("dist sync should not run by default")
+
+    monkeypatch.setattr(runtime, "_sync_official_dist_json", fail_if_called)
+    runtime._ensure_initialized()  # noqa: SLF001
+
+
 @pytest.mark.asyncio
 async def test_runtime_normalizes_public_id_and_runtime_model_id(
     monkeypatch: pytest.MonkeyPatch,
@@ -171,11 +198,11 @@ async def test_runtime_normalizes_public_id_and_runtime_model_id(
 
 
 @pytest.mark.asyncio
-async def test_runtime_temporarily_unsets_unsupported_socks4_proxy(
+async def test_runtime_rejects_unsupported_socks4_proxy(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Unsupported socks4 proxy vars should not break ai-lib client creation."""
+    """Unsupported socks4 proxy vars should fail fast with actionable error."""
     protocol_root = tmp_path / "ai-protocol"
     model_dir = protocol_root / "v1" / "models"
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -200,26 +227,59 @@ async def test_runtime_temporarily_unsets_unsupported_socks4_proxy(
     monkeypatch.setenv("ALL_PROXY", "socks4://127.0.0.1:9999")
 
     runtime = PythonRuntime(ai_protocol_path=str(protocol_root))
-    observed_proxy_during_create: str | None = None
+    with pytest.raises(ModelSwitcherError) as exc:
+        await runtime.switch_model("openai/gpt-4o")
+    assert "Unsupported proxy scheme" in str(exc.value)
+    assert "unsupported_proxy_env_vars" in exc.value.details
+    assert os.getenv("ALL_PROXY") == "socks4://127.0.0.1:9999"
 
-    async def fake_create(*_: object, **__: object) -> object:
-        nonlocal observed_proxy_during_create
-        observed_proxy_during_create = os.getenv("ALL_PROXY")
 
-        class _DummyClient:
-            async def close(self) -> None:
-                return None
+def test_runtime_detects_duplicate_public_model_ids(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Duplicate provider/model ids across manifests should raise explicit errors."""
+    protocol_root = tmp_path / "ai-protocol"
+    model_dir = protocol_root / "v1" / "models"
+    model_dir.mkdir(parents=True, exist_ok=True)
 
-        return _DummyClient()
-
-    monkeypatch.setattr(
-        "spiderswitch.runtime.python_runtime.AiClient.create",
-        fake_create,
+    (model_dir / "first.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "models": {
+                    "gpt-4o": {
+                        "provider": "openai",
+                        "model_id": "gpt-4o",
+                        "capabilities": ["streaming"],
+                    }
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (model_dir / "second.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "models": {
+                    "gpt-4o": {
+                        "provider": "openai",
+                        "model_id": "gpt-4o",
+                        "capabilities": ["tools"],
+                    }
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
     )
 
-    await runtime.switch_model("openai/gpt-4o")
-    assert observed_proxy_during_create is None
-    assert os.getenv("ALL_PROXY") == "socks4://127.0.0.1:9999"
+    monkeypatch.setenv("SPIDERSWITCH_SYNC_DIST", "0")
+    runtime = PythonRuntime(ai_protocol_path=str(protocol_root))
+    with pytest.raises(ModelSwitcherError) as exc:
+        runtime._ensure_initialized()  # noqa: SLF001
+    assert "Failed to load model manifests from ai-protocol" in str(exc.value)
+    assert "Duplicate model id detected" in str(exc.value.details.get("error", ""))
 
 
 @pytest.mark.asyncio

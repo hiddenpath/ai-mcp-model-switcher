@@ -13,8 +13,6 @@ import asyncio
 import json
 import logging
 import os
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -201,24 +199,17 @@ class PythonRuntime(Runtime):
         # under the tool schema and validator pattern.
         return raw_model_id.rsplit("/", 1)[-1]
 
-    @contextmanager
-    def _sanitized_proxy_environment(self) -> Iterator[dict[str, str]]:
-        """Temporarily unset unsupported proxy schemes for ai-lib client creation."""
-        sanitized: dict[str, str] = {}
+    @staticmethod
+    def _detect_unsupported_proxy_env() -> dict[str, str]:
+        """Detect unsupported proxy env vars without mutating process env."""
+        unsupported: dict[str, str] = {}
         for env_key in PROXY_ENV_VARS:
             value = os.getenv(env_key)
             if not value:
                 continue
-            lowered = value.lower()
-            if lowered.startswith(UNSUPPORTED_PROXY_SCHEMES):
-                sanitized[env_key] = value
-                os.environ.pop(env_key, None)
-
-        try:
-            yield sanitized
-        finally:
-            for env_key, value in sanitized.items():
-                os.environ[env_key] = value
+            if value.lower().startswith(UNSUPPORTED_PROXY_SCHEMES):
+                unsupported[env_key] = value
+        return unsupported
 
     def _load_models_from_protocol(self, base_path: Path) -> dict[str, ModelInfo]:
         """Load model inventory from ai-protocol `v1/models/*.yaml` files."""
@@ -230,6 +221,7 @@ class PythonRuntime(Runtime):
             )
 
         loaded: dict[str, ModelInfo] = {}
+        model_sources: dict[str, str] = {}
         for model_file in sorted(model_dir.glob("*.yaml")):
             content = yaml.safe_load(model_file.read_text(encoding="utf-8"))
             if not isinstance(content, dict):
@@ -259,6 +251,16 @@ class PythonRuntime(Runtime):
                     raw_model_id=raw_model_id,
                 )
                 full_id = f"{provider}/{public_model_name}"
+                source_path = str(model_file)
+                if full_id in loaded:
+                    raise ModelSwitcherError(
+                        f"Duplicate model id detected: '{full_id}'",
+                        details={
+                            "model_id": full_id,
+                            "first_source": model_sources.get(full_id),
+                            "duplicate_source": source_path,
+                        },
+                    )
                 capabilities_raw = model_data.get("capabilities", [])
                 capabilities = (
                     [c for c in capabilities_raw if isinstance(c, str)]
@@ -272,6 +274,7 @@ class PythonRuntime(Runtime):
                     capabilities=self._capabilities_from_list(capabilities),
                     runtime_model_id=runtime_model_id,
                 )
+                model_sources[full_id] = source_path
 
         return loaded
 
@@ -303,7 +306,10 @@ class PythonRuntime(Runtime):
             if not (os.getenv("AI_PROTOCOL_PATH") or os.getenv("AI_PROTOCOL_DIR")):
                 os.environ["AI_PROTOCOL_PATH"] = str(base_path)
 
-            self._sync_official_dist_json(base_path)
+            sync_on_init = os.getenv("SPIDERSWITCH_SYNC_ON_INIT", "0").lower()
+            if sync_on_init in {"1", "true", "yes"}:
+                logger.info("SPIDERSWITCH_SYNC_ON_INIT enabled, syncing dist snapshot on init.")
+                self._sync_official_dist_json(base_path)
 
             self._available_models = self._load_models_from_protocol(base_path)
             self._is_initialized = True
@@ -407,6 +413,7 @@ class PythonRuntime(Runtime):
         # Validate key source before creating a new client.
         DEFAULT_VALIDATOR.validate_api_key_configuration(model_id=model_id, api_key=api_key)
         proxy_status = get_provider_proxy_status(provider)
+        unsupported_proxy_env = self._detect_unsupported_proxy_env()
         if (
             proxy_status.get("proxy_required_guess")
             and not proxy_status.get("proxy_configured")
@@ -414,6 +421,19 @@ class PythonRuntime(Runtime):
             logger.warning(
                 "Provider '%s' may require proxy, but no proxy env var is configured.",
                 provider,
+            )
+        if unsupported_proxy_env:
+            unsupported_keys = sorted(unsupported_proxy_env.keys())
+            raise ModelSwitcherError(
+                "Unsupported proxy scheme detected in environment.",
+                details={
+                    "unsupported_proxy_env_vars": unsupported_keys,
+                    "supported_proxy_schemes": ["http://", "https://", "socks5://"],
+                    "hint": (
+                        "Please update proxy env vars to supported schemes, or unset them "
+                        "before calling switch_model."
+                    ),
+                },
             )
 
         async with self._switch_lock:
@@ -426,24 +446,18 @@ class PythonRuntime(Runtime):
 
             # Create new client
             try:
-                with self._sanitized_proxy_environment() as sanitized_proxy:
-                    if sanitized_proxy:
-                        logger.warning(
-                            "Ignoring unsupported proxy scheme in env vars: %s",
-                            sorted(sanitized_proxy.keys()),
-                        )
-                    self._current_client = await AiClient.create(
-                        model=model_info.runtime_model_id or model_id,
-                        api_key=api_key,
-                        base_url=base_url,
-                    )
+                self._current_client = await AiClient.create(
+                    model=model_info.runtime_model_id or model_id,
+                    api_key=api_key,
+                    base_url=base_url,
+                )
                 self._current_model_info = model_info
                 logger.info(f"Successfully switched to model: {model_id}")
             except Exception as e:
                 self._current_client = None
                 self._current_model_info = None
-                logger.error(f"Failed to create client for model '{model_id}': {e}")
-                details: dict[str, object] = {"error": str(e)}
+                logger.exception("Failed to create client for model '%s'", model_id)
+                details: dict[str, object] = {"provider": provider}
                 if (
                     proxy_status.get("proxy_required_guess")
                     and not proxy_status.get("proxy_configured")

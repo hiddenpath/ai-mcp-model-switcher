@@ -86,6 +86,8 @@ class MCPResponse:
         message: str,
         error_type: str = "RuntimeError",
         details: dict[str, Any] | None = None,
+        error_code: str | None = None,
+        request_id: str | None = None,
     ) -> MCPResponse:
         """Create an error response.
         创建错误响应。
@@ -99,6 +101,10 @@ class MCPResponse:
             MCPResponse with error status
         """
         error_info: dict[str, Any] = {"type": error_type, "message": message}
+        if error_code:
+            error_info["code"] = error_code
+        if request_id:
+            error_info["request_id"] = request_id
         if details:
             error_info["details"] = details
 
@@ -109,6 +115,7 @@ def format_error_response(
     message: str,
     error_type: str = "RuntimeError",
     error_code: str | None = None,
+    request_id: str | None = None,
 ) -> TextContent:
     """Format an error response as TextContent.
     格式化错误响应为 TextContent。
@@ -131,6 +138,8 @@ def format_error_response(
 
     if error_code:
         error_dict["error"]["code"] = error_code
+    if request_id:
+        error_dict["error"]["request_id"] = request_id
 
     return TextContent(type="text", text=json.dumps(error_dict, ensure_ascii=False))
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from uuid import uuid4
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -116,6 +117,7 @@ def create_app(
             List of response content or error content
         """
         args = arguments or {}
+        request_id = str(uuid4())
         try:
             if name == "switch_model":
                 requested_runtime_id = _runtime_id_from_args(args)
@@ -156,6 +158,8 @@ def create_app(
                 response = MCPResponse.error(
                     message=f"Unknown tool: {name}",
                     error_type="UnknownToolError",
+                    error_code="SPIDER-UNKNOWN-TOOL",
+                    request_id=request_id,
                 )
                 return [response.to_text_content()]
         except Exception as e:
@@ -163,12 +167,15 @@ def create_app(
                 f"Error handling tool call '{name}': {e}",
                 extra={
                     "tool": name,
+                    "request_id": request_id,
                     "arguments": _redact_sensitive_arguments(args),
                 }
             )
             response = MCPResponse.error(
-                message=f"Internal error: {e}",
+                message="Internal server error",
                 error_type="InternalServerError",
+                error_code="SPIDER-INTERNAL-ERROR",
+                request_id=request_id,
             )
             return [response.to_text_content()]
 

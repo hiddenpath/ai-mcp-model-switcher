@@ -10,6 +10,9 @@ Provides structured error responses and proper logging.
 from __future__ import annotations
 
 import logging
+import os
+import threading
+import time
 
 from mcp.types import TextContent, Tool
 
@@ -19,6 +22,25 @@ from ..runtime.base import Runtime
 from ..state import ModelStateManager
 
 logger = logging.getLogger(__name__)
+
+_STATUS_CACHE_LOCK = threading.Lock()
+_STATUS_CACHE: dict[int, tuple[float, list[TextContent]]] = {}
+
+
+def _get_status_cache_ttl_seconds() -> float:
+    """Get get_status cache TTL from environment."""
+    raw = os.getenv("SPIDERSWITCH_STATUS_CACHE_TTL_SEC", "2")
+    try:
+        ttl = float(raw)
+    except ValueError:
+        return 2.0
+    return max(0.0, ttl)
+
+
+def invalidate_cache(state_manager: ModelStateManager) -> None:
+    """Invalidate cached status response for a state manager."""
+    with _STATUS_CACHE_LOCK:
+        _STATUS_CACHE.pop(id(state_manager), None)
 
 
 def tool_schema() -> Tool:
@@ -60,14 +82,26 @@ async def handle(
     Returns:
         List of TextContent with status
     """
+    cache_ttl = _get_status_cache_ttl_seconds()
+    now = time.monotonic()
+    cache_key = id(state_manager)
+    if cache_ttl > 0:
+        with _STATUS_CACHE_LOCK:
+            cached = _STATUS_CACHE.get(cache_key)
+            if cached and (now - cached[0]) < cache_ttl:
+                return cached[1]
+
     try:
         state = state_manager.get_state()
         result = state.to_dict()
         result["runtime_profile"] = runtime.describe_runtime_profile().to_dict()
 
         response = MCPResponse.success(data=result)
-
-        return [response.to_text_content()]
+        payload = [response.to_text_content()]
+        if cache_ttl > 0:
+            with _STATUS_CACHE_LOCK:
+                _STATUS_CACHE[cache_key] = (now, payload)
+        return payload
 
     except ModelSwitcherError as e:
         logger.error(f"Failed to get status: {e}")
@@ -75,16 +109,18 @@ async def handle(
             message=str(e),
             error_type=e.__class__.__name__,
             details=e.details if hasattr(e, "details") else None,
+            error_code="SPIDER-STATUS-FAILED",
         )
         return [response.to_text_content()]
 
     except Exception as e:
         logger.exception(f"Unexpected error in get_status: {e}")
         response = MCPResponse.error(
-            message=f"Internal error: {e}",
+            message="Internal tool error",
             error_type="RuntimeError",
+            error_code="SPIDER-STATUS-INTERNAL",
         )
         return [response.to_text_content()]
 
 
-__all__ = ["tool_schema", "handle"]
+__all__ = ["tool_schema", "handle", "invalidate_cache"]

@@ -56,19 +56,62 @@ export GOOGLE_API_KEY="..."
 - 服务端日志会做敏感字段脱敏，但客户端调用轨迹中仍可能暴露明文参数。
 
 可选运行时环境变量：
-- `SPIDERSWITCH_SYNC_DIST=0`：关闭启动时官方 `dist` json 同步。
+- `SPIDERSWITCH_SYNC_ON_INIT=1`：开启运行时初始化阶段的 `dist` 同步（默认关闭）。
+- `SPIDERSWITCH_SYNC_DIST=0`：在显式触发同步时关闭 `dist` 同步。
 - `AI_PROTOCOL_DIST_BASE_URL`：覆盖官方 raw dist 源地址。
 - `AI_PROTOCOL_DIST_API_BASE_URL`：覆盖 models/providers dist json 的 GitHub API 列表源地址。
+- `SPIDERSWITCH_LIST_CACHE_TTL_SEC`：`list_models` 缓存 TTL（默认 `5` 秒）。
+- `SPIDERSWITCH_STATUS_CACHE_TTL_SEC`：`get_status` 缓存 TTL（默认 `2` 秒）。
+
+### 一键安装（插件市场形态）
+
+```bash
+bash scripts/install_one_click.sh
+```
+
+安装后可执行：
+
+```bash
+spiderswitch init --client cursor --output ~/.cursor/mcp.spiderswitch.json --force
+spiderswitch doctor --json
+```
 
 ### 配置
 
-添加到你的MCP客户端配置（如Cursor、Claude Desktop）：
+添加到你的MCP客户端配置：
+
+#### OpenCode 配置
+
+配置文件路径：`~/.config/opencode/opencode.json`
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "spiderswitch": {
+      "type": "local",
+      "command": ["python3", "-m", "spiderswitch.server"],
+      "enabled": true,
+      "environment": {
+        "AI_PROTOCOL_PATH": "/path/to/ai-protocol",
+        "OPENAI_API_KEY": "sk-your-key",
+        "ANTHROPIC_API_KEY": "sk-ant-your-key",
+        "DEEPSEEK_API_KEY": "sk-your-key"
+      }
+    }
+  }
+}
+```
+
+#### Claude Desktop / Cursor 配置
+
+配置文件路径：`~/.config/claude-desktop/config.json` 或 `~/.cursor/mcp.json`
 
 ```json
 {
   "mcpServers": {
     "spiderswitch": {
-      "command": "python",
+      "command": "python3",
       "args": ["-m", "spiderswitch.server"],
       "env": {
         "AI_PROTOCOL_PATH": "/path/to/ai-protocol"
@@ -78,6 +121,16 @@ export GOOGLE_API_KEY="..."
 }
 ```
 
+### 验证配置（OpenCode）
+
+```bash
+# 查看已加载的MCP服务器
+opencode mcp list
+
+# 预期输出：
+# ✓ spiderswitch connected
+#   python3 -m spiderswitch.server
+```
 ### 使用方法
 
 在Agent中调用MCP工具：

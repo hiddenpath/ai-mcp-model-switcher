@@ -23,6 +23,7 @@ class _DummyRuntime(Runtime):
     def __init__(self) -> None:
         self.last_filter_provider: str | None = None
         self.last_filter_capability: str | None = None
+        self.list_models_calls = 0
         self.closed = False
 
     async def list_models(
@@ -30,6 +31,7 @@ class _DummyRuntime(Runtime):
         filter_provider: str | None = None,
         filter_capability: str | None = None,
     ) -> list[ModelInfo]:
+        self.list_models_calls += 1
         self.last_filter_provider = filter_provider
         self.last_filter_capability = filter_capability
         return [
@@ -121,6 +123,18 @@ async def test_status_tool_includes_connection_coordination_metadata() -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_tool_uses_ttl_cache_for_same_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """list_models should reuse cached payload for same query within TTL."""
+    monkeypatch.setenv("SPIDERSWITCH_LIST_CACHE_TTL_SEC", "3600")
+    runtime = _DummyRuntime()
+    await list_tool.handle(runtime=runtime, arguments={})
+    await list_tool.handle(runtime=runtime, arguments={})
+    assert runtime.list_models_calls == 1
+
+
+@pytest.mark.asyncio
 async def test_switch_tool_missing_model_returns_structured_error() -> None:
     """switch_model should return structured validation error for missing model."""
     runtime = _DummyRuntime()
@@ -129,6 +143,33 @@ async def test_switch_tool_missing_model_returns_structured_error() -> None:
     payload = json.loads(result[0].text)
     assert payload["status"] == "error"
     assert payload["error"]["type"] == "InvalidModelError"
+    assert payload["error"]["code"] == "SPIDER-INVALID-MODEL"
+
+
+@pytest.mark.asyncio
+async def test_status_cache_invalidates_after_switch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """status cache should be invalidated once switch updates state."""
+    monkeypatch.setenv("SPIDERSWITCH_STATUS_CACHE_TTL_SEC", "3600")
+    runtime = _DummyRuntime()
+    state = ModelStateManager()
+    status_tool.invalidate_cache(state)
+
+    before = await status_tool.handle(state, runtime)
+    before_payload = json.loads(before[0].text)
+    assert before_payload["data"]["is_configured"] is False
+
+    await switch_tool.handle(
+        runtime=runtime,
+        state_manager=state,
+        arguments={"model": "openai/gpt-4o"},
+    )
+
+    after = await status_tool.handle(state, runtime)
+    after_payload = json.loads(after[0].text)
+    assert after_payload["data"]["is_configured"] is True
+    assert after_payload["data"]["connection_epoch"] == 1
 
 
 @pytest.mark.asyncio

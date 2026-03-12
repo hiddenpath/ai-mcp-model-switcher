@@ -22,6 +22,7 @@ from ..runtime.python_runtime import (
 )
 from ..state import ModelStateManager
 from ..validation import get_provider_proxy_status
+from . import status as status_tool
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ async def handle(
         # Update state
         runtime_profile = runtime.describe_runtime_profile()
         state_manager.update_from_model_info_with_runtime(model_info, runtime_id=runtime_profile.runtime_id)
+        status_tool.invalidate_cache(state_manager)
 
         proxy_status = get_provider_proxy_status(model_info.provider)
         warnings: list[str] = []
@@ -134,6 +136,7 @@ async def handle(
             message=str(e),
             error_type="InvalidModelError",
             details=e.details if hasattr(e, "details") else None,
+            error_code="SPIDER-INVALID-MODEL",
         )
         return [response.to_text_content()]
 
@@ -144,6 +147,7 @@ async def handle(
             message=str(e),
             error_type=e.__class__.__name__,
             details=e.details if hasattr(e, "details") else None,
+            error_code="SPIDER-SWITCH-FAILED",
         )
         return [response.to_text_content()]
 
@@ -151,8 +155,9 @@ async def handle(
         # Unexpected error
         logger.exception(f"Unexpected error in switch_model: {e}")
         response = MCPResponse.error(
-            message=f"Internal error: {e}",
+            message="Internal tool error",
             error_type="RuntimeError",
+            error_code="SPIDER-SWITCH-INTERNAL",
         )
         return [response.to_text_content()]
 

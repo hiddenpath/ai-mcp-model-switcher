@@ -10,6 +10,10 @@ Provides structured error responses and proper logging.
 from __future__ import annotations
 
 import logging
+import os
+import threading
+import time
+from copy import deepcopy
 
 from mcp.types import TextContent, Tool
 
@@ -20,6 +24,19 @@ from ..runtime.python_runtime import format_model_info
 from ..validation import get_provider_api_key_status, get_provider_proxy_status
 
 logger = logging.getLogger(__name__)
+
+_LIST_CACHE_LOCK = threading.Lock()
+_LIST_CACHE: dict[tuple[int, str | None, str | None, bool], tuple[float, dict[str, object]]] = {}
+
+
+def _get_list_cache_ttl_seconds() -> float:
+    """Get list_models cache TTL from environment."""
+    raw = os.getenv("SPIDERSWITCH_LIST_CACHE_TTL_SEC", "5")
+    try:
+        ttl = float(raw)
+    except ValueError:
+        return 5.0
+    return max(0.0, ttl)
 
 
 def tool_schema() -> Tool:
@@ -100,43 +117,57 @@ async def handle(
             f"require_api_key={require_api_key}"
         )
 
-        # Get models from runtime
-        models = await runtime.list_models(
-            filter_provider=filter_provider,
-            filter_capability=filter_capability,
+        cache_key = (
+            id(runtime),
+            filter_provider,
+            filter_capability,
+            require_api_key,
         )
+        cache_ttl = _get_list_cache_ttl_seconds()
+        cached_payload: dict[str, object] | None = None
+        now = time.monotonic()
+        if cache_ttl > 0:
+            with _LIST_CACHE_LOCK:
+                cached = _LIST_CACHE.get(cache_key)
+                if cached and (now - cached[0]) < cache_ttl:
+                    cached_payload = deepcopy(cached[1])
 
-        # Format response with success status
-        provider_status_cache: dict[str, dict[str, object]] = {}
-        provider_proxy_cache: dict[str, dict[str, object]] = {}
-        model_entries: list[dict[str, object]] = []
-        for model in models:
-            provider = model.provider
-            if provider not in provider_status_cache:
-                provider_status_cache[provider] = get_provider_api_key_status(provider)
-            if provider not in provider_proxy_cache:
-                provider_proxy_cache[provider] = get_provider_proxy_status(provider)
-
-            # Filter out models from providers without API keys if required
-            if require_api_key:
-                api_key_status = provider_status_cache[provider]
-                if not api_key_status.get("has_api_key", False):
-                    logger.debug(
-                        f"Skipping model {model.id} from provider {provider}: "
-                        "no API key configured"
-                    )
-                    continue
-
-            model_entries.append(
-                {
-                    **format_model_info(model),
-                    "api_key_status": provider_status_cache[provider],
-                    "proxy_status": provider_proxy_cache[provider],
-                }
+        if cached_payload is None:
+            # Get models from runtime
+            models = await runtime.list_models(
+                filter_provider=filter_provider,
+                filter_capability=filter_capability,
             )
+            # Format response with success status
+            provider_status_cache: dict[str, dict[str, object]] = {}
+            provider_proxy_cache: dict[str, dict[str, object]] = {}
+            model_entries: list[dict[str, object]] = []
+            for model in models:
+                provider = model.provider
+                if provider not in provider_status_cache:
+                    provider_status_cache[provider] = get_provider_api_key_status(provider)
+                if provider not in provider_proxy_cache:
+                    provider_proxy_cache[provider] = get_provider_proxy_status(provider)
 
-        response = MCPResponse.success(
-            data={
+                # Filter out models from providers without API keys if required
+                if require_api_key:
+                    api_key_status = provider_status_cache[provider]
+                    if not api_key_status.get("has_api_key", False):
+                        logger.debug(
+                            f"Skipping model {model.id} from provider {provider}: "
+                            "no API key configured"
+                        )
+                        continue
+
+                model_entries.append(
+                    {
+                        **format_model_info(model),
+                        "api_key_status": provider_status_cache[provider],
+                        "proxy_status": provider_proxy_cache[provider],
+                    }
+                )
+
+            cached_payload = {
                 "count": len(model_entries),
                 "models": model_entries,
                 "runtime_profile": runtime.describe_runtime_profile().to_dict(),
@@ -145,8 +176,12 @@ async def handle(
                     "provider": filter_provider,
                     "capability": filter_capability,
                 },
-            },
-        )
+            }
+            if cache_ttl > 0:
+                with _LIST_CACHE_LOCK:
+                    _LIST_CACHE[cache_key] = (now, deepcopy(cached_payload))
+
+        response = MCPResponse.success(data=cached_payload)
 
         return [response.to_text_content()]
 
@@ -156,14 +191,16 @@ async def handle(
             message=str(e),
             error_type=e.__class__.__name__,
             details=e.details if hasattr(e, "details") else None,
+            error_code="SPIDER-LIST-FAILED",
         )
         return [response.to_text_content()]
 
     except Exception as e:
         logger.exception(f"Unexpected error in list_models: {e}")
         response = MCPResponse.error(
-            message=f"Internal error: {e}",
+            message="Internal tool error",
             error_type="RuntimeError",
+            error_code="SPIDER-LIST-INTERNAL",
         )
         return [response.to_text_content()]
 

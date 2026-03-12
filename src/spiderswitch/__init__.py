@@ -24,9 +24,9 @@ from __future__ import annotations
 
 def main() -> None:
     """Main entry point for the MCP server."""
-    from spiderswitch.server import cli
+    from spiderswitch.cli import main as cli_main
 
-    cli()
+    _ = cli_main()
 
 
 __all__ = ["main"]

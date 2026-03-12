@@ -13,6 +13,7 @@ from mcp.types import TextContent, Tool
 from ..response import MCPResponse
 from ..runtime.base import Runtime
 from ..state import ModelStateManager
+from . import status as status_tool
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ async def handle(
             state_manager.reset(runtime_id=runtime_id)
         else:
             state_manager.reset()
+        status_tool.invalidate_cache(state_manager)
         response = MCPResponse.success(
             data={
                 "exited": True,
@@ -78,8 +80,9 @@ async def handle(
     except Exception as e:
         logger.exception("Failed to exit spiderswitch mode: %s", e)
         response = MCPResponse.error(
-            message=f"Failed to exit switcher mode: {e}",
+            message="Failed to exit switcher mode",
             error_type="RuntimeError",
+            error_code="SPIDER-EXIT-FAILED",
         )
         return [response.to_text_content()]
 

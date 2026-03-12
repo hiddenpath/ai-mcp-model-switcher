@@ -57,19 +57,62 @@ Security note:
 - The server redacts sensitive fields in logs, but passing secrets in arguments still increases exposure risk in client traces.
 
 Optional runtime env controls:
-- `SPIDERSWITCH_SYNC_DIST=0` to disable startup sync of official `dist` json files.
+- `SPIDERSWITCH_SYNC_ON_INIT=1` to enable dist sync during runtime initialization (default: disabled).
+- `SPIDERSWITCH_SYNC_DIST=0` to disable dist sync when it is explicitly invoked.
 - `AI_PROTOCOL_DIST_BASE_URL` to override raw dist source (default official GitHub raw URL).
 - `AI_PROTOCOL_DIST_API_BASE_URL` to override GitHub API listing source for models/providers dist json.
+- `SPIDERSWITCH_LIST_CACHE_TTL_SEC` for `list_models` cache TTL (default: `5`).
+- `SPIDERSWITCH_STATUS_CACHE_TTL_SEC` for `get_status` cache TTL (default: `2`).
+
+### One-Click Install (Plugin-Market Style)
+
+```bash
+bash scripts/install_one_click.sh
+```
+
+Then generate MCP client config template:
+
+```bash
+spiderswitch init --client cursor --output ~/.cursor/mcp.spiderswitch.json --force
+spiderswitch doctor --json
+```
 
 ### Configuration
 
-Add to your MCP client configuration (e.g., Cursor, Claude Desktop):
+Add to your MCP client configuration:
+
+#### For OpenCode
+
+Configuration file: `~/.config/opencode/opencode.json`
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "spiderswitch": {
+      "type": "local",
+      "command": ["python3", "-m", "spiderswitch.server"],
+      "enabled": true,
+      "environment": {
+        "AI_PROTOCOL_PATH": "/path/to/ai-protocol",
+        "OPENAI_API_KEY": "sk-your-key",
+        "ANTHROPIC_API_KEY": "sk-ant-your-key",
+        "DEEPSEEK_API_KEY": "sk-your-key"
+      }
+    }
+  }
+}
+```
+
+#### For Claude Desktop / Cursor
+
+Configuration file: `~/.config/claude-desktop/config.json` or `~/.cursor/mcp.json`
 
 ```json
 {
   "mcpServers": {
     "spiderswitch": {
-      "command": "python",
+      "command": "python3",
       "args": ["-m", "spiderswitch.server"],
       "env": {
         "AI_PROTOCOL_PATH": "/path/to/ai-protocol"
@@ -79,6 +122,16 @@ Add to your MCP client configuration (e.g., Cursor, Claude Desktop):
 }
 ```
 
+### Verification (OpenCode)
+
+```bash
+# List loaded MCP servers
+opencode mcp list
+
+# Expected output:
+# ✓ spiderswitch connected
+#   python3 -m spiderswitch.server
+```
 ### Usage
 
 In your agent, call MCP tools:
