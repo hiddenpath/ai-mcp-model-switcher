@@ -31,10 +31,10 @@ from .base import ModelCapabilities, ModelInfo, Runtime, RuntimeProfile
 logger = logging.getLogger(__name__)
 
 OFFICIAL_DIST_RAW_BASE_URL = (
-    "https://raw.githubusercontent.com/hiddenpath/ai-protocol/main/dist/v1"
+    "https://raw.githubusercontent.com/ailib-official/ai-protocol/main/dist/v1"
 )
 OFFICIAL_DIST_API_BASE_URL = (
-    "https://api.github.com/repos/hiddenpath/ai-protocol/contents/dist/v1"
+    "https://api.github.com/repos/ailib-official/ai-protocol/contents/dist/v1"
 )
 UNSUPPORTED_PROXY_SCHEMES = ("socks4://", "socks4a://")
 
