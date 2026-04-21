@@ -222,6 +222,7 @@ Parameters:
 - `AI_PROTOCOL_DIST_API_BASE_URL`: override GitHub API listing URL
 - `SPIDERSWITCH_LIST_CACHE_TTL_SEC`: `list_models` cache TTL (default `5`)
 - `SPIDERSWITCH_STATUS_CACHE_TTL_SEC`: `get_status` cache TTL (default `2`)
+- `AI_HTTP_TRUST_ENV=1`: pass standard proxy env vars through to **ai-lib-python** after `switch_model` (SDK default is opt-in since 0.7.5)
 
 ---
 
@@ -237,6 +238,7 @@ Parameters:
 
 - Unsupported proxy schemes (for example `socks4://`) are rejected.
 - Use supported proxy schemes: `http://`, `https://`, or `socks5://`.
+- If you rely on `HTTP_PROXY` / `HTTPS_PROXY` for **model API calls**, set `AI_HTTP_TRUST_ENV=1` in the MCP server environment so ai-lib-python’s httpx client honors them (spiderswitch’s own readiness hints and dist sync are separate from this SDK flag).
 
 ### No models found
 

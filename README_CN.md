@@ -62,6 +62,7 @@ export GOOGLE_API_KEY="..."
 - `AI_PROTOCOL_DIST_API_BASE_URL`：覆盖 models/providers dist json 的 GitHub API 列表源地址。
 - `SPIDERSWITCH_LIST_CACHE_TTL_SEC`：`list_models` 缓存 TTL（默认 `5` 秒）。
 - `SPIDERSWITCH_STATUS_CACHE_TTL_SEC`：`get_status` 缓存 TTL（默认 `2` 秒）。
+- `AI_HTTP_TRUST_ENV=1`：让 **ai-lib-python**（`switch_model` 之后实际发请求）的 HTTP 客户端信任标准代理环境变量（`HTTP_PROXY` / `HTTPS_PROXY` 等）；不设则 SDK 默认不走这些变量（见 ai-lib-python 传输层说明）。
 
 ### 一键安装（插件市场形态）
 

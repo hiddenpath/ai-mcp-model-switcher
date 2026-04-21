@@ -16,6 +16,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 ### Changed
 - Clarified routing boundary in docs: spiderswitch provides routing capability signals only; strategy policy remains in upper-layer applications.
 - Extended MCP tool schemas (`switch_model`, `list_models`, `get_status`, `exit_switcher`) with `runtime_id` and reset scope semantics.
+- Raised minimum **ai-lib-python** dependency to `>=0.8.0` (tested against current SDK releases).
+- Documented `AI_HTTP_TRUST_ENV` alongside proxy guidance so behavior matches ai-lib-python’s opt-in HTTP proxy semantics.
+- Dist sync HTTP `User-Agent` now derives from the installed package version; `__version__` aligned with `pyproject.toml`.
+- Clarified `python_runtime` module header: protocol loading is internal to **AiClient**, not a direct **ProtocolLoader** integration.
 
 ## [0.4.0] - 2026-03-06
 

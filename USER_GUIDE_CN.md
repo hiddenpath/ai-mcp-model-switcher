@@ -220,6 +220,7 @@ spiderswitch init --client cursor --output ~/.cursor/mcp.spiderswitch.json --for
 - `AI_PROTOCOL_DIST_API_BASE_URL`：覆盖 GitHub API 列表源地址
 - `SPIDERSWITCH_LIST_CACHE_TTL_SEC`：`list_models` 缓存 TTL（默认 `5`）
 - `SPIDERSWITCH_STATUS_CACHE_TTL_SEC`：`get_status` 缓存 TTL（默认 `2`）
+- `AI_HTTP_TRUST_ENV=1`：`switch_model` 之后由 **ai-lib-python** 发请求时，让 httpx 信任标准代理环境变量（SDK 自 0.7.5 起默认需显式开启）
 
 ---
 
@@ -235,6 +236,7 @@ spiderswitch init --client cursor --output ~/.cursor/mcp.spiderswitch.json --for
 
 - 不支持的代理 scheme（例如 `socks4://`）会被拒绝。
 - 请使用 `http://`、`https://` 或 `socks5://`。
+- 若依赖 `HTTP_PROXY` / `HTTPS_PROXY` 访问**模型 API**，请在 MCP 服务端环境中设置 `AI_HTTP_TRUST_ENV=1`，以便 ai-lib-python 的 httpx 使用这些变量（与 spiderswitch 的就绪提示、dist 同步逻辑相互独立）。
 
 ### 模型列表为空
 

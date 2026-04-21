@@ -63,6 +63,7 @@ Optional runtime env controls:
 - `AI_PROTOCOL_DIST_API_BASE_URL` to override GitHub API listing source for models/providers dist json.
 - `SPIDERSWITCH_LIST_CACHE_TTL_SEC` for `list_models` cache TTL (default: `5`).
 - `SPIDERSWITCH_STATUS_CACHE_TTL_SEC` for `get_status` cache TTL (default: `2`).
+- `AI_HTTP_TRUST_ENV=1` so **ai-lib-python** (used after `switch_model`) forwards standard proxy env vars to its HTTP client; without this, `HTTP_PROXY` / `HTTPS_PROXY` may be ignored by the SDK (see ai-lib-python transport docs).
 
 ### One-Click Install (Plugin-Market Style)
 

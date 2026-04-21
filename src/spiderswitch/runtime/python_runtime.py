@@ -1,7 +1,7 @@
 # spiderswitch Python runtime implementation
 """
-ai-lib-python runtime implementation using ProtocolLoader and AiClient.
-使用ai-lib-python SDK的实现，通过ProtocolLoader和AiClient进行模型交互。
+ai-lib-python runtime implementation using AiClient (protocol loading is internal to the SDK).
+使用 ai-lib-python SDK 的 AiClient 进行模型交互（协议加载由 SDK 内部完成）。
 
 Follows ARCH-001: All provider configurations loaded from ai-protocol manifests.
 遵循 ARCH-001：所有 provider 配置从 ai-protocol manifests 加载。
@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -37,6 +38,16 @@ OFFICIAL_DIST_API_BASE_URL = (
     "https://api.github.com/repos/ailib-official/ai-protocol/contents/dist/v1"
 )
 UNSUPPORTED_PROXY_SCHEMES = ("socks4://", "socks4a://")
+
+
+def _spiderswitch_user_agent() -> str:
+    """User-Agent for outbound HTTP (dist sync). Uses installed dist version when available."""
+    try:
+        return f"spiderswitch/{version('spiderswitch')}"
+    except PackageNotFoundError:
+        from spiderswitch import __version__ as pkg_version
+
+        return f"spiderswitch/{pkg_version}"
 
 
 class PythonRuntime(Runtime):
@@ -129,14 +140,14 @@ class PythonRuntime(Runtime):
     def _download_file(url: str, target: Path) -> None:
         """Download a file to target path."""
         target.parent.mkdir(parents=True, exist_ok=True)
-        req = Request(url, headers={"User-Agent": "spiderswitch/0.4.0"})
+        req = Request(url, headers={"User-Agent": _spiderswitch_user_agent()})
         with urlopen(req, timeout=10) as resp:
             content = resp.read()
         target.write_bytes(content)
 
     def _download_dir_from_github_api(self, api_url: str, target_dir: Path) -> None:
         """Download all json files from a GitHub API directory listing."""
-        req = Request(api_url, headers={"User-Agent": "spiderswitch/0.4.0"})
+        req = Request(api_url, headers={"User-Agent": _spiderswitch_user_agent()})
         with urlopen(req, timeout=10) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
 
